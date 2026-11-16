@@ -263,11 +263,13 @@ function Privacy() {
   return <main id="main" className="wrap section privacy">
     <Link to="/" className="text-link"><ArrowRight className="back-arrow" size={17} /> Retour à l’accueil</Link>
     <h1>Confidentialité</h1>
+    <h2>Tes échanges avec EnglishMate AI</h2>
+    <p>Quand tu écris à EnglishMate AI ou que tu lui envoies un vocal en message direct, ton échange se déroule dans une conversation privée sur Telegram. Les autres utilisateurs du bot ne voient pas tes messages dans leur propre conversation.</p>
+    <h2>Comment le bot utilise tes messages</h2>
+    <p>Telegram transmet ton texte ou ton vocal à EnglishMate AI. Le bot analyse ton message pour te répondre et, si besoin, t’expliquer une correction en français. Quand tu envoies un vocal, le bot peut te répondre à l’oral en anglais.</p>
+    <p><a href="https://telegram.org/privacy#6-bot-messages">En savoir plus sur les données transmises aux bots Telegram <ArrowUpRight size={16} aria-hidden="true" /></a></p>
     <h2>Sur ce site</h2>
-    <p>Les démonstrations utilisent des exemples prédéfinis, sans accès au microphone. Les choix effectués dans les aperçus restent sur la page. Le navigateur charge les polices depuis Google Fonts.</p>
-    <h2>Sur Telegram</h2>
-    <p>Le lien vers le bot ouvre Telegram. Les messages envoyés à EnglishMate AI y sont traités pour permettre au bot de répondre.</p>
-    <p><a href="https://telegram.org/privacy">Consulter la politique de confidentialité de Telegram <ArrowUpRight size={16} /></a></p>
+    <p>Le site présente des exemples de conversation. Il ne reçoit ni tes messages Telegram ni tes enregistrements et n’accède pas à ton microphone. Tes choix dans les démonstrations restent sur la page. Ton navigateur charge les polices depuis Google Fonts.</p>
   </main>
 }
 
