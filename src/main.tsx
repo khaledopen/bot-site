@@ -102,7 +102,6 @@ function Reveal({ children, className }: { children: ReactNode; className?: stri
 function Hero() {
   return <section className="wrap hero" aria-labelledby="hero-title">
     <div className="hero-copy">
-      <div className="hero-badge" lang="en"><span />100 % FREE · POWERED BY AI · ON TELEGRAM</div>
       <h1 id="hero-title" lang="en">Speak English.<br />Make Mistakes.<br /><em>Get Better.</em></h1>
       <p>Ton coach d'anglais personnel sur Telegram. Envoie un vocal, reçois des corrections simples en français et écoute une réponse en anglais. Pratique chaque jour, à ton rythme et gratuitement.</p>
       <div className="hero-actions">
