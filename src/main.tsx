@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { AnimatePresence, MotionConfig, motion, useInView } from 'motion/react'
+import { AnimatePresence, MotionConfig, motion, useInView, useReducedMotion } from 'motion/react'
 import {
   ArrowDown, ArrowRight, ArrowUpRight, AudioLines, Check, ChevronDown, ChevronLeft,
   CircleHelp, Gift, Headphones, Layers3, Menu, MessageCircle, Mic, Monitor, Send, Sparkle, X,
@@ -171,6 +171,27 @@ function HowItWorks() {
 }
 
 function VoiceSection() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const videoInView = useInView(videoRef, { once: true, amount: 0.35 })
+  const reducedMotion = useReducedMotion()
+  const [soundOff, setSoundOff] = useState(true)
+
+  useEffect(() => {
+    if (videoInView && !reducedMotion) void videoRef.current?.play().catch(() => {})
+  }, [videoInView, reducedMotion])
+
+  function toggleVideoSound() {
+    const video = videoRef.current
+    if (!video) return
+    if (video.muted || video.volume === 0) {
+      if (video.volume === 0) video.volume = 1
+      video.muted = false
+      if (video.paused) void video.play().catch(() => {})
+    } else {
+      video.muted = true
+    }
+  }
+
   const voiceSteps = [
     ['Tu parles', 'Enregistre un vocal sur le Web ou envoie-le depuis Telegram.'],
     ['Tu apprends', 'Le bot identifie tes erreurs et t’explique simplement comment t’améliorer.'],
@@ -179,12 +200,16 @@ function VoiceSection() {
   return <section className="voice-section" id="fonctionnalites">
     <div className="wrap voice-layout">
       <Reveal className="voice-motion">
-        <video controls loop playsInline preload="none" width="1440" height="1440"
+        <video ref={videoRef} controls loop muted playsInline preload="none" width="1440" height="1440"
+          onVolumeChange={event => setSoundOff(event.currentTarget.muted || event.currentTarget.volume === 0)}
           poster="/englishmate-voice-motion-poster.webp" aria-label="Démonstration de la pratique vocale, 14 secondes">
           <source src="/englishmate-voice-motion.mp4" type="video/mp4" />
           <track kind="captions" src="/englishmate-voice-motion.fr.vtt" srcLang="fr" label="Français" />
           <a href="/englishmate-voice-motion.mp4">Télécharger la démonstration vocale</a>
         </video>
+        <button className="voice-sound-toggle" type="button" onClick={toggleVideoSound}>
+          {soundOff ? 'Activer le son' : 'Couper le son'}
+        </button>
       </Reveal>
       <Reveal>
         <p className="eyebrow">La pratique vocale</p>

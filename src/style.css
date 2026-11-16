@@ -107,6 +107,8 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 .voice-steps p { margin-top: 4px; color: #d3daed; }
 .voice-motion video { display: block; width: 100%; height: auto; aspect-ratio: 1; border: 1px solid #ffffff35; border-radius: 26px; background: #eeedea; }
 .voice-motion video:focus-visible { outline-color: #bdf4d8; }
+.voice-sound-toggle { display: block; min-height: 44px; margin-top: 8px; padding: 0 14px; border: 1px solid #bdf4d8; border-radius: 8px; color: #bdf4d8; font-size: 14px; font-weight: 700; }
+.voice-sound-toggle:hover { background: #bdf4d818; }
 
 .level-card { display: flex; flex-direction: column; gap: 9px; text-align: left; border: 1px solid transparent; border-radius: 18px; padding: 23px; min-height: 190px; transition: transform .2s, border-color .2s; }
 .level-card:hover { transform: translateY(-4px); }
