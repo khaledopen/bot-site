@@ -115,7 +115,6 @@ function Hero() {
       <div className="hero-actions">
         <Link className="button practice-primary" to="/pratiquer"><MessageCircle size={18} aria-hidden="true" /> Pratiquer sur le Web</Link>
         <TelegramLink>Commencer gratuitement</TelegramLink>
-        <a className="text-link" href="#comment-ca-marche"><ArrowDown size={17} aria-hidden="true" /> Découvrir comment ça marche</a>
       </div>
     </div>
     <div className="hero-art">
