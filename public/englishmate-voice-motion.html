@@ -213,14 +213,24 @@ function content(i,t) {
   } else if(i===5) {
     icon('check',248,412,28);
     label('Correction',280,412,26,680,DIM);
-    phrase('Yesterday, I',237,500);
+    const prefix='Yesterday, I';
+    label(prefix,237,500,34,650);
+    const x=237+ctx.measureText(prefix).width+12;
     const change=ramp((t-5.41)/.26);
-    const active=mix(69,115,change);
-    round(434,468,active,64,16,MINT);
-    ctx.save();ctx.globalAlpha*=1-change;label('go',468,499,37,720,BLACK,'center');ctx.restore();
-    ctx.save();ctx.globalAlpha*=change;label('went',491,499,37,720,BLACK,'center');ctx.restore();
-    label('to the market.',434+active+15,499,34,650);
-    rule(443,544,437+active*change,544,BLACK,3);
+    ctx.font='720 36px Geist, sans-serif';
+    const active=mix(ctx.measureText('go').width,ctx.measureText('went').width,change)+20;
+    round(x,477,active,46,11,MINT);
+    ctx.save();
+    ctx.beginPath();ctx.roundRect(x+4,477,active-8,46,8);ctx.clip();
+    if(change<.48){
+      ctx.globalAlpha*=1-ramp(change/.48);
+      label('go',x+active/2,500,36,720,BLACK,'center');
+    }else{
+      ctx.globalAlpha*=ramp((change-.48)/.52);
+      label('went',x+active/2,500,36,720,BLACK,'center');
+    }
+    ctx.restore();
+    label('to the market.',x+active+12,500,34,650);
     label('Le prétérit de go est went.',237,578,24,500,DIM);
   } else if(i===6) {
     label('Pourquoi went ?',225,407,42,740);
@@ -267,7 +277,6 @@ window.seek=function seek(seconds) {
 };
 document.fonts.ready.then(()=>window.seek(0));
 </script>
-
 <!-- Geist font license
 Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font.git)
 
