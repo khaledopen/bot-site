@@ -238,6 +238,8 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 .app-layout { display: grid; grid-template-columns: minmax(168px, 19%) minmax(0, 1fr); gap: clamp(14px, 3vw, 38px); align-items: start; padding-block: 30px 75px; }
 .app-sidebar { min-width: 0; background: #151f40; color: white; border-radius: 18px; padding: 14px; }
 .app-username { padding: 8px 9px 12px; color: #bbf3d7; font-weight: 700; overflow-wrap: anywhere; }
+.app-clock { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 7px; margin-bottom: 9px; padding: 8px 9px; color: #d3daed; font-size: 13px; }
+.app-clock time { margin-inline-start: auto; color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
 .app-sidebar nav { display: grid; gap: 3px; }
 .app-sidebar nav a, .app-sidebar nav button { display: flex; gap: 8px; align-items: center; min-height: 44px; padding: 9px; border-radius: 8px; text-align: left; line-height: 1.2; }
 .app-sidebar nav :is(a, button):hover, .app-sidebar nav [aria-current] { background: #2d3f70; }

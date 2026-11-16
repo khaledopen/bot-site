@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useId, useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { ArrowLeft, BookOpen, ChartNoAxesColumn, LayoutDashboard, LogOut, MessageCircle, Mic, Send, Settings } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChartNoAxesColumn, Clock, LayoutDashboard, LogOut, MessageCircle, Mic, Send, Settings } from 'lucide-react'
 import { VisibilityButton } from '@/components/ui/btn-18'
 import { accountApi, ApiError, defaults, errorMessage, goals, levels, modes, type Account, type Preferences } from './account'
 import { TELEGRAM_BOT_URL } from './content'
@@ -204,6 +204,37 @@ const navigation = [
   ['My Progress', 'progress', ChartNoAxesColumn], ['Settings', 'settings', Settings],
 ] as const
 
+function LocalClock() {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    let timer: number
+    function update() {
+      window.clearTimeout(timer)
+      const current = new Date()
+      setNow(current)
+      timer = window.setTimeout(update, 60_000 - current.getTime() % 60_000)
+    }
+
+    update()
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [])
+
+  const localTime = new Intl.DateTimeFormat('fr-FR', {
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(now)
+
+  return <div className="app-clock">
+    <Clock size={16} aria-hidden="true" />
+    <span>Heure locale</span>
+    <time dateTime={localTime}>{localTime}</time>
+  </div>
+}
+
 export function AppLayout() {
   const { account, setAccount } = useAccount()
   const navigate = useNavigate()
@@ -221,6 +252,7 @@ export function AppLayout() {
   return <main id="main" className="wrap app-layout">
     <aside className="app-sidebar">
       <p className="app-username">{account?.username}</p>
+      <LocalClock />
       <nav aria-label="Espace EnglishMate">
         {navigation.map(([label, route, Icon]) => <NavLink key={route} to={route}><Icon size={18} aria-hidden="true" />{label}</NavLink>)}
         <a href={TELEGRAM_BOT_URL}><Send size={18} aria-hidden="true" />Telegram</a>
