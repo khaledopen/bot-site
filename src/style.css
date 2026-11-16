@@ -105,13 +105,8 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 .voice-steps li { display: flex; gap: 13px; align-items: flex-start; }
 .voice-steps li > b { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #7495ac; border-radius: 50%; flex-shrink: 0; color: #bdf4d8; font-size: 13px; }
 .voice-steps p { margin-top: 4px; color: #d3daed; }
-.voice-art { min-height: 410px; border: 1px solid #ffffff35; border-radius: 26px; overflow: hidden; position: relative; isolation: isolate; display: grid; place-items: center; background: repeating-radial-gradient(circle at center, #ffffff23 0 1px, transparent 2px 40px), #2649e5; }
-.voice-device { display: grid; place-items: center; width: 147px; height: 253px; border: 5px solid #bdf4d8; box-shadow: 15px 17px 0 #152c9b; border-radius: 24px; transform: rotate(-14deg); background: #19254f; position: absolute; top: 55px; }
-.voice-device div { width: 40px; height: 5px; border-radius: 10px; background: #bdf4d8; position: absolute; top: 9px; }
-.voice-device svg { width: 43px; height: 43px; color: #bdf4d8; margin-bottom: 70px; }
-.large-wave { position: relative; gap: clamp(3px, .55vw, 8px); height: 97px; color: #bdf4d8; margin-top: 66px; }
-.large-wave i { flex-basis: 5px; width: 5px; }
-.voice-art > span:last-child { position: absolute; bottom: 25px; display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; }
+.voice-motion video { display: block; width: 100%; height: auto; aspect-ratio: 1; border: 1px solid #ffffff35; border-radius: 26px; background: #eeedea; }
+.voice-motion video:focus-visible { outline-color: #bdf4d8; }
 
 .level-card { display: flex; flex-direction: column; gap: 9px; text-align: left; border: 1px solid transparent; border-radius: 18px; padding: 23px; min-height: 190px; transition: transform .2s, border-color .2s; }
 .level-card:hover { transform: translateY(-4px); }
@@ -302,8 +297,7 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
   .level-example { align-items: flex-start; flex-direction: column; }
   .voice-section, .demo-section { padding-block: 59px; }
   .voice-layout > :first-child { grid-row: 2; }
-  .voice-art { min-height: 340px; }
-  .voice-device { top: 37px; height: 215px; }
+  .voice-motion video { border-radius: 17px; }
   .timeline { grid-template-columns: 1fr; margin-left: 7px; }
   .timeline li { border-top: 0; border-left: 2px solid #8db7a3; padding: 0 0 20px 18px; }
   .timeline li::before { top: 7px; left: -7px; }

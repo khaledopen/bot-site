@@ -56,11 +56,11 @@ function Header() {
 
 const bars = [7, 13, 9, 17, 24, 14, 20, 28, 15, 23, 11, 19, 26, 13, 21, 10, 17, 24, 14, 8, 16, 11, 6]
 
-function Wave({ large = false }: { large?: boolean }) {
+function Wave() {
   const ref = useRef<HTMLSpanElement>(null)
   const inView = useInView(ref, { once: true })
-  return <span ref={ref} className={`wave ${large ? 'large-wave' : ''}`} data-animate={inView} aria-hidden="true">
-    {bars.map((height, index) => <i key={index} style={{ height: large ? height * 2.9 : height, animationDelay: `${index * -0.09}s` }} />)}
+  return <span ref={ref} className="wave" data-animate={inView} aria-hidden="true">
+    {bars.map((height, index) => <i key={index} style={{ height, animationDelay: `${index * -0.09}s` }} />)}
   </span>
 }
 
@@ -172,16 +172,19 @@ function HowItWorks() {
 
 function VoiceSection() {
   const voiceSteps = [
-    ['Tu parles', 'Envoie un vocal depuis Telegram.'],
+    ['Tu parles', 'Enregistre un vocal sur le Web ou envoie-le depuis Telegram.'],
     ['Tu apprends', 'Le bot identifie tes erreurs et t’explique simplement comment t’améliorer.'],
     ['Tu écoutes', 'Reçois une réponse vocale en anglais pour travailler ta compréhension et ta prononciation.'],
   ]
   return <section className="voice-section" id="fonctionnalites">
     <div className="wrap voice-layout">
-      <Reveal className="voice-art">
-        <div className="voice-device"><div /><Mic aria-hidden="true" /></div>
-        <Wave large />
-        <span><Headphones size={18} aria-hidden="true" /> Réponse vocale en anglais</span>
+      <Reveal className="voice-motion">
+        <video controls loop playsInline preload="none" width="1440" height="1440"
+          poster="/englishmate-voice-motion-poster.webp" aria-label="Démonstration de la pratique vocale, 14 secondes">
+          <source src="/englishmate-voice-motion.mp4" type="video/mp4" />
+          <track kind="captions" src="/englishmate-voice-motion.fr.vtt" srcLang="fr" label="Français" />
+          <a href="/englishmate-voice-motion.mp4">Télécharger la démonstration vocale</a>
+        </video>
       </Reveal>
       <Reveal>
         <p className="eyebrow">La pratique vocale</p>
