@@ -1,13 +1,17 @@
 import { StrictMode, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Link, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion, useInView } from 'motion/react'
 import {
   ArrowDown, ArrowRight, ArrowUpRight, AudioLines, Check, ChevronDown, ChevronLeft,
-  CircleHelp, Gift, Headphones, Layers3, Menu, MessageCircle, Mic, Send, Sparkle, X,
+  CircleHelp, Gift, Headphones, Layers3, Menu, MessageCircle, Mic, Monitor, Send, Sparkle, X,
 } from 'lucide-react'
 import { faq, levels, routine, TELEGRAM_BOT_URL } from './content'
 import Practice from './Practice'
+import {
+  AccountProvider, AccountSettings, AppLayout, AuthPage, Dashboard, Onboarding, RequireAccount,
+  Vocabulary, useAccount,
+} from './AccountPages'
 import './style.css'
 
 const navItems = [
@@ -26,6 +30,7 @@ function Brand() {
 
 function Header() {
   const [open, setOpen] = useState(false)
+  const { account } = useAccount()
   const { pathname, hash } = useLocation()
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView()
@@ -41,6 +46,7 @@ function Header() {
         </button>
         <nav id="site-nav" className={open ? 'navigation open' : 'navigation'} aria-label="Navigation principale">
           {navItems.map(([label, id]) => <Link key={id} onClick={() => setOpen(false)} to={`/#${id}`}>{label}</Link>)}
+          <Link onClick={() => setOpen(false)} to={account ? '/app/dashboard' : '/login'}>{account ? 'Mon espace' : 'Se connecter'}</Link>
         </nav>
         <TelegramLink className="header-cta">Ouvrir Telegram</TelegramLink>
       </div>
@@ -105,6 +111,7 @@ function Hero() {
     <div className="hero-copy">
       <h1 id="hero-title" lang="en">Speak English.<br />Make Mistakes.<br /><em>Get Better.</em></h1>
       <p>Ton coach d'anglais personnel sur Telegram. Envoie un vocal, reçois des corrections simples en français et écoute une réponse en anglais. Pratique chaque jour, à ton rythme et gratuitement.</p>
+      <p className="hero-slogan" lang="en">Your English Journey Starts Here.</p>
       <div className="hero-actions">
         <Link className="button practice-primary" to="/pratiquer"><MessageCircle size={18} aria-hidden="true" /> Pratiquer sur le Web</Link>
         <TelegramLink>Commencer gratuitement</TelegramLink>
@@ -119,6 +126,31 @@ function Hero() {
       <div className="art-mascot" aria-hidden="true"><img src="/mate.svg" alt="" /></div>
     </div>
   </section>
+}
+
+function LearningOptions() {
+  return <section className="section wrap learning-options" aria-labelledby="learning-options-title">
+    <div className="section-heading">
+      <h2 id="learning-options-title" lang="en">Choose how you want to learn.</h2>
+      <p>Apprends l’anglais directement sur Telegram ou depuis ton navigateur. Ton coach IA t’accompagne où que tu sois.</p>
+    </div>
+    <div className="learning-cards">
+      <article><Send size={29} aria-hidden="true" /><h3 lang="en">Learn on Telegram</h3>
+        <p>Tu utilises déjà Telegram ? Retrouve ton professeur directement dans ton application préférée.</p>
+        <TelegramLink><span lang="en">Open Telegram Bot</span></TelegramLink>
+      </article>
+      <article><Monitor size={29} aria-hidden="true" /><h3 lang="en">Learn on the Web</h3>
+        <p>Pas de Telegram ? Aucun problème. Crée ton compte gratuitement et commence à apprendre directement ici.</p>
+        <Link to="/register" className="button practice-primary" lang="en">Create Free Account <ArrowRight size={18} aria-hidden="true" /></Link>
+      </article>
+    </div>
+  </section>
+}
+
+function PracticeEntry() {
+  const { account, loading, failure } = useAccount()
+  if (loading) return <main id="main" className="wrap account-shell"><p role="status">Chargement de ton espace…</p></main>
+  return <Navigate to={account ? '/app/tutor' : failure ? '/login' : '/register'} replace />
 }
 
 function HowItWorks() {
@@ -250,7 +282,7 @@ function FAQ() {
 
 function Home() {
   return <main id="main">
-    <Hero /><HowItWorks /><VoiceSection /><LevelSection /><DemoSection /><Benefits /><Routine /><FAQ />
+    <Hero /><LearningOptions /><HowItWorks /><VoiceSection /><LevelSection /><DemoSection /><Benefits /><Routine /><FAQ />
     <section className="wrap final-wrap"><div className="final-cta">
       <img src="/mate.svg" alt="" width="78" height="78" />
       <h2>Ton anglais progresse, une conversation à la fois.</h2>
@@ -272,7 +304,8 @@ function Privacy() {
     <h2>Sur ce site</h2>
     <p>Le site présente des exemples et propose une page de pratique Web. Le navigateur demande l’accès au micro quand tu démarres un enregistrement. Tu peux écouter ou annuler ton vocal avant de l’envoyer. Ton navigateur charge les polices depuis Google Fonts.</p>
     <h2>Sur la page de pratique Web</h2>
-    <p>Le serveur transmet à Groq les messages que tu envoies pour générer une réponse. Pour un vocal, Groq transcrit l’enregistrement. La partie anglaise de la réponse est envoyée au service de synthèse vocale de Google. Le serveur garde le contexte de ta conversation en mémoire pour te répondre et le retire après 30 minutes d’inactivité. Les textes et les vocaux de pratique restent en dehors du canal admin Telegram.</p>
+    <p>Ton compte Web utilise un pseudo, un mot de passe haché et un cookie de session. Tes préférences, tes messages, les transcriptions, les réponses et tes mots enregistrés sont conservés dans Supabase pour que tu puisses retrouver ton espace. Tu peux supprimer ces données en supprimant ton compte depuis les réglages.</p>
+    <p>Le serveur transmet à Groq les messages que tu envoies pour produire une réponse ou transcrire un vocal. La synthèse vocale de Google reçoit la partie anglaise de la réponse. Le site traite les enregistrements pour produire une transcription et conserve seulement le texte de cette transcription dans ton historique. Tes conversations Web n’apparaissent pas dans le canal admin Telegram.</p>
   </main>
 }
 
@@ -289,9 +322,29 @@ function Footer() {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode><BrowserRouter><MotionConfig reducedMotion="user">
+  <StrictMode><BrowserRouter><MotionConfig reducedMotion="user"><AccountProvider>
     <a className="skip-link" href="#main">Aller au contenu</a><Header />
-    <Routes><Route path="/" element={<Home />} /><Route path="/pratiquer" element={<Practice />} /><Route path="/confidentialite" element={<Privacy />} /><Route path="*" element={<main id="main" className="section wrap privacy"><h1>Page introuvable</h1><Link className="text-link" to="/">Retour à l’accueil <ArrowRight size={17} /></Link></main>} /></Routes>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/pratiquer" element={<PracticeEntry />} />
+      <Route path="/register" element={<AuthPage key="register" mode="register" />} />
+      <Route path="/login" element={<AuthPage key="login" mode="login" />} />
+      <Route path="/recover" element={<AuthPage key="recover" mode="recover" />} />
+      <Route path="/confidentialite" element={<Privacy />} />
+      <Route element={<RequireAccount onboarding />}><Route path="/onboarding" element={<Onboarding />} /></Route>
+      <Route element={<RequireAccount />}>
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="tutor" element={<Practice key="written" />} />
+          <Route path="speaking" element={<Practice key="voice" voice />} />
+          <Route path="vocabulary" element={<Vocabulary />} />
+          <Route path="progress" element={<Dashboard progress />} />
+          <Route path="settings" element={<AccountSettings />} />
+        </Route>
+      </Route>
+      <Route path="*" element={<main id="main" className="section wrap privacy"><h1>Page introuvable</h1><Link className="text-link" to="/">Retour à l’accueil <ArrowRight size={17} /></Link></main>} />
+    </Routes>
     <Footer />
-  </MotionConfig></BrowserRouter></StrictMode>,
+  </AccountProvider></MotionConfig></BrowserRouter></StrictMode>,
 )
