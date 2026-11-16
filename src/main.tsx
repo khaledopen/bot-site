@@ -7,6 +7,7 @@ import {
   CircleHelp, Gift, Headphones, Layers3, Menu, MessageCircle, Mic, Send, Sparkle, X,
 } from 'lucide-react'
 import { faq, levels, routine, TELEGRAM_BOT_URL } from './content'
+import Practice from './Practice'
 import './style.css'
 
 const navItems = [
@@ -105,6 +106,7 @@ function Hero() {
       <h1 id="hero-title" lang="en">Speak English.<br />Make Mistakes.<br /><em>Get Better.</em></h1>
       <p>Ton coach d'anglais personnel sur Telegram. Envoie un vocal, reçois des corrections simples en français et écoute une réponse en anglais. Pratique chaque jour, à ton rythme et gratuitement.</p>
       <div className="hero-actions">
+        <Link className="button practice-primary" to="/pratiquer"><MessageCircle size={18} aria-hidden="true" /> Pratiquer sur le Web</Link>
         <TelegramLink>Commencer gratuitement</TelegramLink>
         <a className="text-link" href="#comment-ca-marche"><ArrowDown size={17} aria-hidden="true" /> Découvrir comment ça marche</a>
       </div>
@@ -268,7 +270,9 @@ function Privacy() {
     <p>Telegram transmet ton texte ou ton vocal à EnglishMate AI. Le bot analyse ton message pour te répondre et, si besoin, t’expliquer une correction en français. Quand tu envoies un vocal, le bot peut te répondre à l’oral en anglais.</p>
     <p><a href="https://telegram.org/privacy#6-bot-messages">En savoir plus sur les données transmises aux bots Telegram <ArrowUpRight size={16} aria-hidden="true" /></a></p>
     <h2>Sur ce site</h2>
-    <p>Le site présente des exemples de conversation. Il ne reçoit ni tes messages Telegram ni tes enregistrements et n’accède pas à ton microphone. Tes choix dans les démonstrations restent sur la page. Ton navigateur charge les polices depuis Google Fonts.</p>
+    <p>Le site présente des exemples et propose une page de pratique Web. Le navigateur demande l’accès au micro quand tu démarres un enregistrement. Tu peux écouter ou annuler ton vocal avant de l’envoyer. Ton navigateur charge les polices depuis Google Fonts.</p>
+    <h2>Sur la page de pratique Web</h2>
+    <p>Le serveur transmet à Groq les messages que tu envoies pour générer une réponse. Pour un vocal, Groq transcrit l’enregistrement. La partie anglaise de la réponse est envoyée au service de synthèse vocale de Google. Le serveur garde le contexte de ta conversation en mémoire pour te répondre et le retire après 30 minutes d’inactivité. Les textes et les vocaux de pratique restent en dehors du canal admin Telegram.</p>
   </main>
 }
 
@@ -287,7 +291,7 @@ function Footer() {
 createRoot(document.getElementById('root')!).render(
   <StrictMode><BrowserRouter><MotionConfig reducedMotion="user">
     <a className="skip-link" href="#main">Aller au contenu</a><Header />
-    <Routes><Route path="/" element={<Home />} /><Route path="/confidentialite" element={<Privacy />} /><Route path="*" element={<main id="main" className="section wrap privacy"><h1>Page introuvable</h1><Link className="text-link" to="/">Retour à l’accueil <ArrowRight size={17} /></Link></main>} /></Routes>
+    <Routes><Route path="/" element={<Home />} /><Route path="/pratiquer" element={<Practice />} /><Route path="/confidentialite" element={<Privacy />} /><Route path="*" element={<main id="main" className="section wrap privacy"><h1>Page introuvable</h1><Link className="text-link" to="/">Retour à l’accueil <ArrowRight size={17} /></Link></main>} /></Routes>
     <Footer />
   </MotionConfig></BrowserRouter></StrictMode>,
 )

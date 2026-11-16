@@ -174,6 +174,35 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 .privacy p a { color: var(--color-electric); text-decoration: underline; }
 .back-arrow { transform: rotate(180deg); }
 
+.practice { max-width: 830px; padding-block: 29px 76px; }
+.practice-primary { background: #141d39; }
+.practice-primary:hover { background: #263861; }
+.practice-header { margin: 17px 0 26px; }
+.practice-header h1 { font-size: clamp(38px, 6vw, 70px); font-weight: 700; letter-spacing: -.075em; line-height: 1.05; }
+.practice-header p { margin-top: 12px; color: #424c65; }
+.practice-chat { background: white; border: 1px solid #d8dfed; border-radius: 22px; overflow: hidden; }
+.practice-toolbar, .practice-form { padding: 15px 20px; }
+.practice-toolbar, .practice-actions, .practice-preview { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 13px; }
+.practice-toolbar label, .practice-form > label { font-size: 14px; font-weight: 700; }
+.practice-toolbar select { margin-left: 7px; border: 1px solid #cad4e6; border-radius: 8px; padding: 6px; }
+.practice-thread { display: grid; gap: 14px; min-height: 160px; max-height: 55vh; overflow-y: auto; padding: 18px 20px; background: #e9edfc; }
+.practice-turn { display: grid; gap: 9px; min-width: 0; }
+.practice-welcome, .practice-user, .practice-reply { width: fit-content; max-width: 100%; padding: 10px 14px; border-radius: 14px; background: white; overflow-wrap: anywhere; }
+.practice-user { justify-self: end; background: #d2f3df; }
+.practice-reply p, .practice-user p { white-space: pre-wrap; }
+.practice-chat audio { display: block; max-width: 100%; margin-top: 8px; }
+.practice-form { display: grid; gap: 10px; }
+.practice-form textarea { display: block; width: 100%; margin-top: 6px; padding: 10px; border: 1px solid #cad4e6; border-radius: 10px; resize: vertical; font-weight: 400; }
+.practice-secondary { background: #e9edfc; color: #192856; }
+.practice-secondary:hover { background: #d8e1ff; }
+.practice button:disabled { opacity: .6; cursor: default; transform: none; }
+.practice-error { color: #922a20; }
+
+@media (max-width: 500px) {
+  .practice-toolbar, .practice-form, .practice-thread { padding-inline: 12px; }
+  .practice-actions .button { padding-inline: 13px; min-height: 44px; }
+}
+
 @media (max-width: 1000px) {
   .wrap { width: calc(100% - 56px); }
   .hero-art { min-height: 472px; }

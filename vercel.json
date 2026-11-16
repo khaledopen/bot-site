@@ -1,4 +1,7 @@
 {
   "framework": "vite",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/practice", "destination": "https://english-tutor-bot-wk41.onrender.com/api/practice" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
