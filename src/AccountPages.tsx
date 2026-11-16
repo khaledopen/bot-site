@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useId, useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { ArrowLeft, BookOpen, ChartNoAxesColumn, Eye, EyeOff, LayoutDashboard, LogOut, MessageCircle, Mic, Send, Settings } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChartNoAxesColumn, LayoutDashboard, LogOut, MessageCircle, Mic, Send, Settings } from 'lucide-react'
+import { VisibilityButton } from '@/components/ui/btn-18'
 import { accountApi, ApiError, defaults, errorMessage, goals, levels, modes, type Account, type Preferences } from './account'
 import { TELEGRAM_BOT_URL } from './content'
 
@@ -37,6 +38,20 @@ export function useAccount() {
   return session
 }
 
+function PasswordField({ label, ...input }: Omit<ComponentProps<'input'>, 'id' | 'type'> & { label: string }) {
+  const id = useId()
+  const [visible, setVisible] = useState(false)
+
+  return <div className="account-password">
+    <label htmlFor={id}>{label}</label>
+    <div className="password-field">
+      <input {...input} id={id} type={visible ? 'text' : 'password'} />
+      <VisibilityButton theme="dark" visible={visible} onVisibilityChange={setVisible} controls={id}
+        fieldLabel={label} disabled={input.disabled} />
+    </div>
+  </div>
+}
+
 export function AuthPage({ mode }: { mode: 'register' | 'login' | 'recover' }) {
   const navigate = useNavigate()
   const { setAccount } = useAccount()
@@ -45,7 +60,6 @@ export function AuthPage({ mode }: { mode: 'register' | 'login' | 'recover' }) {
   const [confirmation, setConfirmation] = useState('')
   const [code, setCode] = useState('')
   const [codes, setCodes] = useState<string[]>([])
-  const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [availability, setAvailability] = useState('')
@@ -109,17 +123,10 @@ export function AuthPage({ mode }: { mode: 'register' | 'login' | 'recover' }) {
           <span role="status">{availability}</span>
         </div>}
         {recover && <label>Code de récupération<input autoComplete="one-time-code" required value={code} onChange={event => setCode(event.target.value)} /></label>}
-        <label>{recover ? 'Nouveau mot de passe' : 'Mot de passe'}
-          <span className="password-field">
-            <input type={visible ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              required minLength={10} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} />
-            <button type="button" aria-label={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} onClick={() => setVisible(!visible)}>
-              {visible ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </span>
-        </label>
-        {mode !== 'login' && <label>Confirme le mot de passe<input type={visible ? 'text' : 'password'}
-          required minLength={10} maxLength={128} autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>}
+        <PasswordField label={recover ? 'Nouveau mot de passe' : 'Mot de passe'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+          required minLength={10} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} />
+        {mode !== 'login' && <PasswordField label="Confirme le mot de passe" required minLength={10} maxLength={128}
+          autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} />}
         {error && <p role="alert" className="practice-error">{error}</p>}
         <button type="submit" className="button" disabled={busy}>{busy ? 'Un instant…' : register ? 'Créer mon compte' : recover ? 'Changer mon mot de passe' : 'Se connecter'}</button>
         <div className="account-inline">
@@ -343,8 +350,8 @@ export function AccountSettings() {
       <summary>Supprimer mon compte</summary>
       <form className="account-form" onSubmit={remove}>
         <p>Ton compte, tes conversations et ton vocabulaire seront supprimés.</p>
-        <label>Confirme avec ton mot de passe<input required type="password" autoComplete="current-password"
-          value={password} onChange={event => setPassword(event.target.value)} /></label>
+        <PasswordField label="Confirme avec ton mot de passe" required autoComplete="current-password"
+          value={password} onChange={event => setPassword(event.target.value)} />
         {error && <p className="practice-error" role="alert">{error}</p>}
         <button className="button" disabled={busy || !password}>Supprimer définitivement</button>
       </form>

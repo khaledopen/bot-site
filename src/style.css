@@ -209,14 +209,19 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 .account-card h1, .app-page h1 { font-size: clamp(34px, 6vw, 64px); font-weight: 700; letter-spacing: -.065em; line-height: 1.05; }
 .account-card > h1 { margin-bottom: 20px; }
 .account-form { display: grid; gap: 15px; }
-.account-form > label { display: grid; gap: 6px; font-size: 14px; font-weight: 700; }
+.account-form > label, .account-password { display: grid; gap: 6px; font-size: 14px; font-weight: 700; }
 .account-form input:not([type="radio"]), .account-form textarea { width: 100%; border: 1px solid #cad4e6; border-radius: 9px; padding: 10px 12px; font-weight: 400; }
 .account-form input:focus, .account-form textarea:focus { border-color: var(--color-electric); }
 .account-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 17px; }
 .account-inline a { color: var(--color-electric); font-weight: 700; }
 .password-field { position: relative; }
-.password-field input { padding-right: 48px !important; }
-.password-field button { position: absolute; inset: 0 0 0 auto; display: grid; place-items: center; width: 45px; }
+.account-form .password-field input { padding-right: 58px; min-height: 48px; }
+.visibility-button { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 7px; background: #e9edfc; color: #192856; }
+.password-field .visibility-button { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); }
+.visibility-button[data-theme="dark"] { background: #151f40; color: #fff; }
+.visibility-button[data-theme="dark"]:hover { background: #2d3f70; }
+.visibility-icon { position: relative; display: grid; place-items: center; width: 16px; height: 16px; }
+.visibility-icon > span { position: absolute; inset: 0; display: grid; place-items: center; }
 .recovery-codes { display: grid; gap: 6px; padding: 12px 18px; border-radius: 10px; background: #e9edfc; }
 .choice-field { min-width: 0; }
 .choice-field legend { margin-bottom: 9px; font-weight: 700; }
