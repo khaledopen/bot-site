@@ -282,7 +282,7 @@ function FAQ() {
 
 function Home() {
   return <main id="main">
-    <Hero /><LearningOptions /><HowItWorks /><VoiceSection /><LevelSection /><DemoSection /><Benefits /><Routine /><FAQ />
+    <Hero /><BrandFilm /><LearningOptions /><HowItWorks /><VoiceSection /><LevelSection /><DemoSection /><Benefits /><Routine /><FAQ />
     <section className="wrap final-wrap"><div className="final-cta">
       <img src="/mate.svg" alt="" width="78" height="78" />
       <h2>Ton anglais progresse, une conversation à la fois.</h2>
@@ -290,6 +290,21 @@ function Home() {
       <TelegramLink>Commencer gratuitement</TelegramLink>
     </div></section>
   </main>
+}
+
+function BrandFilm() {
+  return <section className="wrap brand-film" aria-labelledby="brand-film-title">
+    <div className="brand-film-copy">
+      <h2 id="brand-film-title">Ose <em>l’anglais.</em></h2>
+      <p>Écris, parle et progresse à ton rythme sur le Web ou dans Telegram.</p>
+    </div>
+    <video controls playsInline preload="none" width="1280" height="720"
+      poster="/englishmate-film-poster.webp" aria-label="Film EnglishMate AI, 15 secondes">
+      <source src="/englishmate-film.mp4" type="video/mp4" />
+      <track kind="captions" src="/englishmate-film.fr.vtt" srcLang="fr" label="Français" />
+      <a href="/englishmate-film.mp4">Télécharger le film EnglishMate AI</a>
+    </video>
+  </section>
 }
 
 function Privacy() {
