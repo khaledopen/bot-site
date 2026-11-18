@@ -19,7 +19,7 @@ export type Preferences = {
   dailyMinutes: 10 | 20 | 30
 }
 
-export type Account = { username: string; preferences: Preferences | null }
+export type Account = { username: string; preferences: Preferences | null; admin?: boolean }
 
 export const defaults: Preferences = { level: 'intermediate', goal: 'speaking', mode: 'both', dailyMinutes: 30 }
 

@@ -9,7 +9,7 @@ import {
 import { faq, levels, routine, TELEGRAM_BOT_URL } from './content'
 import Practice from './Practice'
 import {
-  AccountProvider, AccountSettings, AppLayout, AuthCallback, AuthPage, Dashboard, Onboarding, RequireAccount,
+  AccountProvider, AccountSettings, AdminPage, AppLayout, AuthCallback, AuthPage, Dashboard, Onboarding, RequireAccount,
   Vocabulary, useAccount,
 } from './AccountPages'
 import './style.css'
@@ -385,6 +385,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="vocabulary" element={<Vocabulary />} />
           <Route path="progress" element={<Dashboard progress />} />
           <Route path="settings" element={<AccountSettings />} />
+          <Route path="admin" element={<AdminPage />} />
         </Route>
       </Route>
       <Route path="*" element={<main id="main" className="section wrap privacy"><h1>Page introuvable</h1><Link className="text-link" to="/">Retour à l’accueil <ArrowRight size={17} /></Link></main>} />

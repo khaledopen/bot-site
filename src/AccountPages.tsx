@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useId, useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { ArrowLeft, BookOpen, ChartNoAxesColumn, Clock, LayoutDashboard, LogOut, MessageCircle, Send, Settings } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChartNoAxesColumn, Clock, LayoutDashboard, LogOut, MessageCircle, Send, Settings, ShieldCheck } from 'lucide-react'
 import { VisibilityButton } from '@/components/ui/btn-18'
 import { accountApi, ApiError, defaults, errorMessage, goals, levels, modes, type Account, type Preferences } from './account'
 import { TELEGRAM_BOT_URL } from './content'
@@ -333,6 +333,7 @@ export function AppLayout() {
       <LocalClock />
       <nav aria-label="Espace EnglishMate">
         {navigation.map(([label, route, Icon]) => <NavLink key={route} to={route}><Icon size={18} aria-hidden="true" />{label}</NavLink>)}
+        {account?.admin && <NavLink to="admin"><ShieldCheck size={18} aria-hidden="true" />Admin</NavLink>}
         <a href={TELEGRAM_BOT_URL}><Send size={18} aria-hidden="true" />Telegram</a>
         <button type="button" onClick={logout} disabled={busy}><LogOut size={18} aria-hidden="true" />Logout</button>
       </nav>
@@ -466,5 +467,87 @@ export function AccountSettings() {
         <button className="button" disabled={busy || !password}>Supprimer définitivement</button>
       </form>
     </details>
+  </section>
+}
+
+type AdminStats = {
+  users: number; onboarded: number; new_today: number; new_week: number; new_month: number
+  active_today: number; active_week: number; messages: number; voice_messages: number; voice_seconds: number
+  words: number; telegram: number | null
+  signups: { day: string; users: number }[]
+  latest: { email: string; created_at: string; level: string | null; messages: number; last_active: string | null }[]
+}
+
+const shortDate = (value: string) => new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(value))
+const fullDate = (value: string) => new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+
+export function AdminPage() {
+  const { account } = useAccount()
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function load(signal?: AbortSignal) {
+    setBusy(true)
+    setError('')
+    try { setStats(await accountApi<AdminStats>('admin', undefined, signal)) }
+    catch (reason) { if (!signal?.aborted) setError(errorMessage(reason)) }
+    finally { if (!signal?.aborted) setBusy(false) }
+  }
+
+  useEffect(() => {
+    if (!account?.admin) return
+    const controller = new AbortController()
+    void load(controller.signal)
+    return () => controller.abort()
+  }, [account?.admin])
+
+  if (!account?.admin) return <Navigate to="/app/dashboard" replace />
+  const peak = Math.max(1, ...(stats?.signups.map(day => day.users) ?? [1]))
+
+  return <section className="app-page admin-page">
+    <div className="admin-head">
+      <h1>Espace admin</h1>
+      <button type="button" className="button practice-secondary" disabled={busy} onClick={() => load()}>{busy ? 'Actualisation…' : 'Actualiser'}</button>
+    </div>
+    {error && <p role="alert" className="practice-error">{error}</p>}
+    {!stats && !error && <p role="status">Chargement des statistiques…</p>}
+    {stats && <>
+      <dl className="app-stats admin-stats">
+        <div className="admin-highlight"><dt>Utilisateurs inscrits</dt><dd>{stats.users}</dd></div>
+        <div><dt>Nouveaux aujourd’hui</dt><dd>{stats.new_today}</dd></div>
+        <div><dt>Nouveaux (7 jours)</dt><dd>{stats.new_week}</dd></div>
+        <div><dt>Nouveaux (30 jours)</dt><dd>{stats.new_month}</dd></div>
+        <div><dt>Actifs aujourd’hui</dt><dd>{stats.active_today}</dd></div>
+        <div><dt>Actifs (7 jours)</dt><dd>{stats.active_week}</dd></div>
+        <div><dt>Profil configuré</dt><dd>{stats.onboarded}</dd></div>
+        <div><dt>Messages</dt><dd>{stats.messages}</dd></div>
+        <div><dt>Vocaux</dt><dd>{stats.voice_messages}</dd></div>
+        <div><dt>Temps à l’oral</dt><dd>{duration(stats.voice_seconds)}</dd></div>
+        <div><dt>Mots enregistrés</dt><dd>{stats.words}</dd></div>
+        {stats.telegram !== null && <div><dt>Utilisateurs Telegram</dt><dd>{stats.telegram}</dd></div>}
+      </dl>
+      <article className="app-panel">
+        <h2>Inscriptions sur 14 jours</h2>
+        <ol className="admin-chart" aria-label="Inscriptions par jour">
+          {stats.signups.map(day => <li key={day.day} title={`${shortDate(day.day)} : ${day.users}`}>
+            <span className="admin-bar" style={{ height: `${Math.max(4, day.users / peak * 100)}%` }} />
+            <strong>{day.users}</strong>
+            <small>{shortDate(day.day)}</small>
+          </li>)}
+        </ol>
+      </article>
+      <article className="app-panel">
+        <h2>Derniers inscrits</h2>
+        {stats.latest.length ? <div className="admin-table-wrap"><table className="admin-table">
+          <thead><tr><th>Email</th><th>Inscrit le</th><th>Niveau</th><th>Messages</th><th>Dernière activité</th></tr></thead>
+          <tbody>{stats.latest.map(user => <tr key={user.email}>
+            <td>{user.email}</td><td>{fullDate(user.created_at)}</td>
+            <td>{levels.find(([key]) => key === user.level)?.[1] ?? '—'}</td>
+            <td>{user.messages}</td><td>{user.last_active ? fullDate(user.last_active) : '—'}</td>
+          </tr>)}</tbody>
+        </table></div> : <p>Aucun inscrit pour l’instant.</p>}
+      </article>
+    </>}
   </section>
 }

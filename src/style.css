@@ -435,3 +435,19 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
   .wa-field textarea { font-size: 16px; }
 }
 .wa-day { position: sticky; top: 4px; z-index: 1; margin: 10px 0 6px; font-weight: 600; }
+
+/* Espace admin */
+.admin-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-head .button { min-height: 44px; }
+.admin-stats .admin-highlight { background: #274cee; color: white; }
+.admin-chart { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); align-items: end; gap: 6px; height: 190px; margin-top: 14px; }
+.admin-chart li { display: grid; grid-template-rows: 1fr auto auto; justify-items: center; height: 100%; gap: 3px; min-width: 0; }
+.admin-bar { align-self: end; width: 100%; max-width: 30px; border-radius: 6px 6px 2px 2px; background: #274cee; }
+.admin-chart strong { font-size: 12px; }
+.admin-chart small { font-size: 10px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.admin-table-wrap { overflow-x: auto; margin-top: 10px; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.admin-table th, .admin-table td { padding: 9px 10px; border-bottom: 1px solid #e4e3df; text-align: left; white-space: nowrap; }
+.admin-table th { font-size: 12px; color: #6b7280; font-weight: 700; }
+.admin-table td:first-child { white-space: normal; overflow-wrap: anywhere; min-width: 160px; }
+@media (max-width: 600px) { .admin-chart small { display: none; } }

@@ -178,7 +178,9 @@ export default function Practice() {
     setState('permission')
     const attempt = ++microphoneAttempt.current
     try {
-      const media = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const media = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      })
       if (!mount.current || attempt !== microphoneAttempt.current) {
         media.getTracks().forEach(track => track.stop())
         return
@@ -187,7 +189,7 @@ export default function Practice() {
       const mimeType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus']
         .find(type => MediaRecorder.isTypeSupported(type))
       if (!mimeType) throw new Error('unsupported')
-      const active = new MediaRecorder(media, { mimeType })
+      const active = new MediaRecorder(media, { mimeType, audioBitsPerSecond: 128000 })
       const started = performance.now()
       const chunks: Blob[] = []
       recorder.current = active
