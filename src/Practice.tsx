@@ -355,7 +355,13 @@ export default function Practice() {
             </div>
             <div className="wa-bubble wa-in wa-tail">
               {corrections && <div className="wa-quote"><strong><Lightbulb size={14} aria-hidden="true" /> Corrections</strong><p>{corrections}</p></div>}
-              <p lang="en">{answer}</p>
+              <div className="wa-answer">{answer.split('\n').map((line, index) => {
+                const text = line.trim()
+                if (!text) return <span key={index} className="wa-gap" aria-hidden="true" />
+                if (text.startsWith('🇫🇷')) return <p key={index} lang="fr" className="wa-translation">{text.replace(/^🇫🇷\s*/u, '')}</p>
+                if (text.startsWith('👉')) return <p key={index} lang="fr" className="wa-model">{text.replace(/^👉\s*/u, '')}</p>
+                return <p key={index} lang="en">{text}</p>
+              })}</div>
               {turn.audio ? <VoiceNote src={`data:audio/mpeg;base64,${turn.audio}`} label="Écouter la réponse de Nova" /> :
                 <button className="wa-listen" type="button" disabled={audioPending.includes(turn.id)} onClick={() => play(turn.id)}>
                   <Headphones size={15} aria-hidden="true" />{audioPending.includes(turn.id) ? 'Préparation…' : 'Écouter'}</button>}

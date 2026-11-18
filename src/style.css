@@ -460,3 +460,10 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 .admin-table th { font-size: 12px; color: #6b7280; font-weight: 700; }
 .admin-table td:first-child { white-space: normal; overflow-wrap: anywhere; min-width: 160px; }
 @media (max-width: 600px) { .admin-chart small { display: none; } }
+
+/* Aides pour les débutants dans les réponses de Nova */
+.wa-answer { display: grid; gap: 2px; }
+.wa-answer .wa-gap { height: 6px; }
+.wa-translation { color: #667781; font-style: italic; font-size: 13.5px; }
+.wa-translation::before { content: "FR · "; font-style: normal; font-weight: 700; font-size: 11px; color: #8696a0; }
+.wa-model { margin-top: 4px; padding: 6px 9px; border-radius: 8px; background: #e7f6f1; color: #10654a; font-size: 13.5px; font-weight: 600; }
