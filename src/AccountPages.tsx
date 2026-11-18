@@ -371,7 +371,7 @@ export function Dashboard({ progress = false }: { progress?: boolean }) {
       <dl className="app-stats">
         <div><dt>Pratique vocale</dt><dd>{duration(stats.seconds)}</dd></div>
         <div><dt>Mots enregistrés</dt><dd>{stats.words}</dd></div>
-        <div><dt>Messages</dt><dd>{stats.messages}</dd></div>
+        <div><dt>Messages Web</dt><dd>{stats.messages}</dd></div>
       </dl>
       <article className="app-panel"><h2>Les sept derniers jours</h2>
         {stats.activity.length ? <ul className="app-activity">{stats.activity.map(day =>
@@ -470,10 +470,19 @@ export function AccountSettings() {
   </section>
 }
 
+type TelegramUser = {
+  id: string; first_name: string | null; last_name: string | null; username: string | null; language_code: string | null
+  level: string | null; first_seen: string | null; last_seen: string | null; messages: number; voice_messages: number
+}
+type TelegramStats = {
+  users: number; new_today: number | null; new_week: number | null; active_today: number | null; active_week: number | null
+  messages: number | null; voice_messages: number | null; signups: { day: string; users: number }[]; latest: TelegramUser[]
+}
+
 type AdminStats = {
   users: number; onboarded: number; new_today: number; new_week: number; new_month: number
   active_today: number; active_week: number; messages: number; voice_messages: number; voice_seconds: number
-  words: number; telegram: number | null
+  words: number; telegram: TelegramStats | null
   signups: { day: string; users: number }[]
   latest: { email: string; created_at: string; level: string | null; messages: number; last_active: string | null }[]
 }
@@ -503,7 +512,10 @@ export function AdminPage() {
   }, [account?.admin])
 
   if (!account?.admin) return <Navigate to="/app/dashboard" replace />
-  const peak = Math.max(1, ...(stats?.signups.map(day => day.users) ?? [1]))
+  const telegramDays = new Map((stats?.telegram?.signups ?? []).map(day => [day.day, day.users]))
+  const peak = Math.max(1, ...(stats?.signups.map(day => day.users + (telegramDays.get(day.day) ?? 0)) ?? [1]))
+  const tg = stats?.telegram
+  const telegramName = (user: TelegramUser) => [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Compte Telegram'
 
   return <section className="app-page admin-page">
     <div className="admin-head">
@@ -514,31 +526,39 @@ export function AdminPage() {
     {!stats && !error && <p role="status">Chargement des statistiques…</p>}
     {stats && <>
       <dl className="app-stats admin-stats">
-        <div className="admin-highlight"><dt>Utilisateurs inscrits</dt><dd>{stats.users}</dd></div>
-        <div><dt>Nouveaux aujourd’hui</dt><dd>{stats.new_today}</dd></div>
-        <div><dt>Nouveaux (7 jours)</dt><dd>{stats.new_week}</dd></div>
-        <div><dt>Nouveaux (30 jours)</dt><dd>{stats.new_month}</dd></div>
-        <div><dt>Actifs aujourd’hui</dt><dd>{stats.active_today}</dd></div>
-        <div><dt>Actifs (7 jours)</dt><dd>{stats.active_week}</dd></div>
+        <div className="admin-highlight"><dt>Utilisateurs au total</dt><dd>{stats.users + (tg?.users ?? 0)}</dd></div>
+        <div><dt>Inscrits sur le Web</dt><dd>{stats.users}</dd></div>
+        {tg && <div className="admin-telegram"><dt>Utilisateurs Telegram</dt><dd>{tg.users}</dd></div>}
+        <div><dt>Nouveaux Web aujourd’hui</dt><dd>{stats.new_today}</dd></div>
+        <div><dt>Nouveaux Web (7 jours)</dt><dd>{stats.new_week}</dd></div>
+        <div><dt>Nouveaux Web (30 jours)</dt><dd>{stats.new_month}</dd></div>
+        <div><dt>Actifs Web aujourd’hui</dt><dd>{stats.active_today}</dd></div>
+        <div><dt>Actifs Web (7 jours)</dt><dd>{stats.active_week}</dd></div>
         <div><dt>Profil configuré</dt><dd>{stats.onboarded}</dd></div>
-        <div><dt>Messages</dt><dd>{stats.messages}</dd></div>
-        <div><dt>Vocaux</dt><dd>{stats.voice_messages}</dd></div>
+        <div><dt>Messages Web</dt><dd>{stats.messages}</dd></div>
+        <div><dt>Vocaux Web</dt><dd>{stats.voice_messages}</dd></div>
         <div><dt>Temps à l’oral</dt><dd>{duration(stats.voice_seconds)}</dd></div>
         <div><dt>Mots enregistrés</dt><dd>{stats.words}</dd></div>
-        {stats.telegram !== null && <div><dt>Utilisateurs Telegram</dt><dd>{stats.telegram}</dd></div>}
       </dl>
       <article className="app-panel">
-        <h2>Inscriptions sur 14 jours</h2>
-        <ol className="admin-chart" aria-label="Inscriptions par jour">
-          {stats.signups.map(day => <li key={day.day} title={`${shortDate(day.day)} : ${day.users}`}>
-            <span className="admin-bar" style={{ height: `${Math.max(4, day.users / peak * 100)}%` }} />
-            <strong>{day.users}</strong>
-            <small>{shortDate(day.day)}</small>
-          </li>)}
+        <h2>Nouveaux utilisateurs sur 14 jours</h2>
+        <p className="admin-legend"><span className="web" /> Web <span className="tg" /> Telegram</p>
+        <ol className="admin-chart" aria-label="Nouveaux utilisateurs par jour">
+          {stats.signups.map(day => {
+            const fromTelegram = telegramDays.get(day.day) ?? 0
+            return <li key={day.day} title={`${shortDate(day.day)} : ${day.users} Web, ${fromTelegram} Telegram`}>
+              <span className="admin-stack">
+                <span className="admin-bar tg" style={{ height: `${fromTelegram / peak * 100}%` }} />
+                <span className="admin-bar" style={{ height: `${Math.max(day.users || fromTelegram ? 0 : 3, day.users / peak * 100)}%` }} />
+              </span>
+              <strong>{day.users + fromTelegram}</strong>
+              <small>{shortDate(day.day)}</small>
+            </li>
+          })}
         </ol>
       </article>
       <article className="app-panel">
-        <h2>Derniers inscrits</h2>
+        <h2>Derniers inscrits sur le Web</h2>
         {stats.latest.length ? <div className="admin-table-wrap"><table className="admin-table">
           <thead><tr><th>Email</th><th>Inscrit le</th><th>Niveau</th><th>Messages</th><th>Dernière activité</th></tr></thead>
           <tbody>{stats.latest.map(user => <tr key={user.email}>
@@ -548,6 +568,30 @@ export function AdminPage() {
           </tr>)}</tbody>
         </table></div> : <p>Aucun inscrit pour l’instant.</p>}
       </article>
+      {tg && <article className="app-panel admin-telegram-panel">
+        <h2>Utilisateurs Telegram</h2>
+        <dl className="app-stats admin-stats">
+          <div><dt>Utilisateurs</dt><dd>{tg.users}</dd></div>
+          <div><dt>Nouveaux aujourd’hui</dt><dd>{tg.new_today ?? '—'}</dd></div>
+          <div><dt>Nouveaux (7 jours)</dt><dd>{tg.new_week ?? '—'}</dd></div>
+          <div><dt>Actifs aujourd’hui</dt><dd>{tg.active_today ?? '—'}</dd></div>
+          <div><dt>Actifs (7 jours)</dt><dd>{tg.active_week ?? '—'}</dd></div>
+          <div><dt>Messages</dt><dd>{tg.messages ?? '—'}</dd></div>
+          <div><dt>Vocaux</dt><dd>{tg.voice_messages ?? '—'}</dd></div>
+        </dl>
+        {tg.latest.length ? <div className="admin-table-wrap"><table className="admin-table">
+          <thead><tr><th>Nom</th><th>Pseudo</th><th>Arrivé le</th><th>Dernière activité</th><th>Messages</th><th>Vocaux</th><th>Niveau</th><th>Langue</th></tr></thead>
+          <tbody>{tg.latest.map(user => <tr key={user.id}>
+            <td>{telegramName(user)}</td>
+            <td>{user.username ? <a href={`https://t.me/${user.username}`} target="_blank" rel="noreferrer">@{user.username}</a> : '—'}</td>
+            <td>{user.first_seen ? fullDate(user.first_seen) : 'Avant le suivi'}</td>
+            <td>{user.last_seen ? fullDate(user.last_seen) : '—'}</td>
+            <td>{user.messages}</td><td>{user.voice_messages}</td>
+            <td>{levels.find(([key]) => key === user.level)?.[1] ?? '—'}</td>
+            <td>{user.language_code?.toUpperCase() ?? '—'}</td>
+          </tr>)}</tbody>
+        </table></div> : <p>Les infos des utilisateurs Telegram apparaîtront dès leur prochain message au bot.</p>}
+      </article>}
     </>}
   </section>
 }

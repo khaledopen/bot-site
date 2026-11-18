@@ -342,6 +342,7 @@ function Privacy() {
     <p>Quand tu écris à EnglishMate AI ou que tu lui envoies un vocal en message direct, ton échange se déroule dans une conversation privée sur Telegram. Les autres utilisateurs du bot ne voient pas tes messages dans leur propre conversation.</p>
     <h2>Comment le bot utilise tes messages</h2>
     <p>Telegram transmet ton texte ou ton vocal à EnglishMate AI. Le bot analyse ton message pour te répondre et, si besoin, t’expliquer une correction en français. Quand tu envoies un vocal, le bot peut te répondre à l’oral en anglais.</p>
+    <p>Pour suivre l’usage du bot, EnglishMate AI enregistre ton identifiant Telegram, ton prénom et ton nom affichés, ton pseudo, la langue de ton application, la date de ton premier et de ton dernier message, ainsi que le nombre de messages et de vocaux envoyés. Le contenu de tes messages Telegram n’est pas conservé dans cette liste, et seul l’administrateur du service peut la consulter.</p>
     <p><a href="https://telegram.org/privacy#6-bot-messages">En savoir plus sur les données transmises aux bots Telegram <ArrowUpRight size={16} aria-hidden="true" /></a></p>
     <h2>Sur ce site</h2>
     <p>Le site présente des exemples et propose une page de pratique Web. Le navigateur demande l’accès au micro quand tu démarres un enregistrement. Tu peux écouter ou annuler ton vocal avant de l’envoyer. Ton navigateur charge les polices depuis Google Fonts.</p>
