@@ -348,7 +348,7 @@ function Privacy() {
     <p>Le site présente des exemples et propose une page de pratique Web. Le navigateur demande l’accès au micro quand tu démarres un enregistrement. Tu peux écouter ou annuler ton vocal avant de l’envoyer. Ton navigateur charge les polices depuis Google Fonts.</p>
     <h2>Sur la page de pratique Web</h2>
     <p>Ton compte Web utilise ton adresse email et un mot de passe, gérés par Supabase Auth, ainsi qu’un cookie de session. Tes préférences, tes messages, tes enregistrements vocaux, les transcriptions, les réponses et tes mots enregistrés sont conservés dans Supabase pour que tu puisses retrouver ton espace. Tu peux supprimer ces données en supprimant ton compte depuis les réglages.</p>
-    <p>Le serveur transmet à Groq les messages que tu envoies pour produire une réponse ou transcrire un vocal. La synthèse vocale de Google reçoit la partie anglaise de la réponse. Le site conserve tes enregistrements vocaux et leur transcription dans ton historique, pour que tu puisses les réécouter ; ils sont supprimés avec ton compte. Tes conversations Web n’apparaissent pas dans le canal admin Telegram.</p>
+    <p>Le serveur transmet à Groq les messages que tu envoies pour produire une réponse ou transcrire un vocal. La synthèse vocale de Google reçoit la partie anglaise de la réponse. Le site conserve tes enregistrements vocaux pendant 30 jours pour que tu puisses les réécouter, puis les supprime automatiquement ; leur transcription reste dans ton historique jusqu’à la suppression de ton compte. Tes conversations Web n’apparaissent pas dans le canal admin Telegram.</p>
   </main>
 }
 
