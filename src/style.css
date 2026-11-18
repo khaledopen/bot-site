@@ -246,7 +246,7 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 .app-content .practice { padding: 0; max-width: none; }
 .app-panel h2, .app-daily h2 { font-size: clamp(21px, 4vw, 35px); font-weight: 700; letter-spacing: -.04em; }
 .app-daily { display: grid; gap: 12px; justify-items: start; padding: 25px; background: #d2f3df; border-radius: 20px; }
-.app-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.app-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
 .app-stats div { background: #e9edfc; padding: 14px; border-radius: 12px; }
 .app-stats dt { font-size: 13px; }
 .app-stats dd { font-size: 22px; font-weight: 700; }
@@ -293,7 +293,7 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
   .brand-film-copy em { display: inline; }
   .brand-film video { border-radius: 14px; }
   .learning-cards, .steps, .level-cards, .voice-layout, .demo-layout, .faq-layout { grid-template-columns: minmax(0, 1fr); }
-  .app-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+
   .steps article, .level-card { padding: 18px; }
   .level-card { min-height: 0; }
   .level-example { align-items: flex-start; flex-direction: column; }
@@ -434,3 +434,4 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
   .wa-placeholder { font-size: 13px; }
   .wa-field textarea { font-size: 16px; }
 }
+.wa-day { position: sticky; top: 4px; z-index: 1; margin: 10px 0 6px; font-weight: 600; }

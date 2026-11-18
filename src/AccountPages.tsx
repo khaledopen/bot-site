@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useId, useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { ArrowLeft, BookOpen, ChartNoAxesColumn, Clock, LayoutDashboard, LogOut, MessageCircle, Mic, Send, Settings } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChartNoAxesColumn, Clock, LayoutDashboard, LogOut, MessageCircle, Send, Settings } from 'lucide-react'
 import { VisibilityButton } from '@/components/ui/btn-18'
 import { accountApi, ApiError, defaults, errorMessage, goals, levels, modes, type Account, type Preferences } from './account'
 import { TELEGRAM_BOT_URL } from './content'
+import { authMessage, linkError, openSession, redirectTo, supabase } from './supabase'
 
 type Session = {
   account: Account | null
@@ -24,7 +25,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     setFailure('')
     try { setAccount((await accountApi<{ account: Account }>('me')).account) }
     catch (error) {
-      if (error instanceof ApiError && error.status === 401) setAccount(null)
+      if (error instanceof ApiError && error.status === 401) {
+        const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }))
+        const account = data.session ? await openSession(data.session.access_token).catch(() => null) : null
+        setAccount(account)
+      }
       else setFailure(errorMessage(error))
     } finally { setLoading(false) }
   }
@@ -52,90 +57,162 @@ function PasswordField({ label, ...input }: Omit<ComponentProps<'input'>, 'id' |
   </div>
 }
 
-export function AuthPage({ mode }: { mode: 'register' | 'login' | 'recover' }) {
+type AuthMode = 'register' | 'login' | 'recover' | 'reset'
+const authTitles: Record<AuthMode, string> = {
+  register: 'Crée ton compte.', login: 'Connecte-toi.', recover: 'Mot de passe oublié ?', reset: 'Choisis un nouveau mot de passe.',
+}
+const authActions: Record<AuthMode, string> = {
+  register: 'Créer mon compte', login: 'Se connecter', recover: 'Envoyer le lien', reset: 'Enregistrer et me connecter',
+}
+
+function useFinishSession() {
   const navigate = useNavigate()
   const { setAccount } = useAccount()
-  const [username, setUsername] = useState('')
+  return async (accessToken: string) => {
+    const account = await openSession(accessToken)
+    setAccount(account)
+    navigate(account.preferences ? '/app/dashboard' : '/onboarding', { replace: true })
+  }
+}
+
+export function AuthPage({ mode }: { mode: AuthMode }) {
+  const finish = useFinishSession()
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
-  const [code, setCode] = useState('')
-  const [codes, setCodes] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [availability, setAvailability] = useState('')
-  const register = mode === 'register'
-  const recover = mode === 'recover'
-  const title = register ? 'Crée ton compte.' : recover ? 'Récupère ton compte.' : 'Connecte-toi.'
+  const [sent, setSent] = useState('')
+  const [unconfirmed, setUnconfirmed] = useState(false)
+  const [ready, setReady] = useState(mode !== 'reset')
+  const choosing = mode === 'register' || mode === 'reset'
+  const address = email.trim()
 
-  async function checkUsername() {
-    setAvailability('')
-    const candidate = username.trim()
-    try {
-      const result = await accountApi<{ available: boolean }>('available', { username: candidate })
-      setAvailability(result.available ? `« ${candidate} » est disponible.` : `« ${candidate} » est déjà pris.`)
-    } catch (reason) { setAvailability(errorMessage(reason)) }
-  }
+  useEffect(() => {
+    if (mode !== 'reset') return
+    const failure = linkError()
+    if (failure) { setError(failure); return }
+    let active = true
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => { if (session && active) setReady(true) })
+    void supabase.auth.getSession().then(({ data: current }) => { if (current.session && active) setReady(true) })
+    const timer = window.setTimeout(() => {
+      if (active) setReady(value => {
+        if (!value) setError('Ce lien n’est pas valide ou a expiré. Demande un nouveau lien.')
+        return value
+      })
+    }, 5000)
+    return () => { active = false; data.subscription.unsubscribe(); window.clearTimeout(timer) }
+  }, [mode])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (busy) return
     setError('')
-    if (mode !== 'login' && password !== confirmation) {
+    setUnconfirmed(false)
+    if (choosing && password !== confirmation) {
       setError('Les deux mots de passe doivent être identiques.')
       return
     }
     setBusy(true)
     try {
-      const result = await accountApi<{ account: Account; codes?: string[] }>(mode, { username, password, confirmation, code })
-      setAccount(result.account)
-      if (result.codes) setCodes(result.codes)
-      else navigate(result.account.preferences ? '/app/dashboard' : '/onboarding', { replace: true })
-    } catch (reason) { setError(errorMessage(reason)) }
-    finally { setBusy(false) }
+      if (mode === 'register') {
+        const { data, error: failure } = await supabase.auth.signUp({ email: address, password, options: { emailRedirectTo: redirectTo('/auth/callback') } })
+        if (failure) throw failure
+        if (data.session) await finish(data.session.access_token)
+        else setSent(`On vient d’envoyer un lien de confirmation à ${address}. Clique dessus pour activer ton compte.`)
+      } else if (mode === 'login') {
+        const { data, error: failure } = await supabase.auth.signInWithPassword({ email: address, password })
+        if (failure) {
+          if (failure.code === 'email_not_confirmed') setUnconfirmed(true)
+          throw failure
+        }
+        await finish(data.session.access_token)
+      } else if (mode === 'recover') {
+        const { error: failure } = await supabase.auth.resetPasswordForEmail(address, { redirectTo: redirectTo('/reset-password') })
+        if (failure) throw failure
+        setSent(`Si un compte existe pour ${address}, tu vas recevoir un lien pour choisir un nouveau mot de passe.`)
+      } else {
+        const { error: failure } = await supabase.auth.updateUser({ password })
+        if (failure) throw failure
+        const { data } = await supabase.auth.getSession()
+        if (!data.session) throw new ApiError('Ta session a expiré. Demande un nouveau lien.', 401)
+        await finish(data.session.access_token)
+      }
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : authMessage(reason as Error))
+    } finally { setBusy(false) }
   }
 
-  function downloadCodes() {
-    const url = URL.createObjectURL(new Blob([`EnglishMate AI — ${username.trim()}\n\n${codes.join('\n')}`], { type: 'text/plain' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'englishmate-recovery-codes.txt'
-    link.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  async function resend() {
+    setBusy(true)
+    setError('')
+    const { error: failure } = await supabase.auth.resend({ type: 'signup', email: address, options: { emailRedirectTo: redirectTo('/auth/callback') } })
+    setBusy(false)
+    if (failure) setError(authMessage(failure))
+    else { setUnconfirmed(false); setSent(`Nouveau lien envoyé à ${address}. Clique dessus pour activer ton compte.`) }
   }
 
   return <main id="main" className="wrap account-shell">
     <Link to="/" className="text-link"><ArrowLeft size={17} aria-hidden="true" /> Retour à l’accueil</Link>
     <div className="account-card">
-      {codes.length ? <div className="account-form">
-        <h1>Garde tes codes de récupération.</h1>
-        <p>Chaque code fonctionne une seule fois. Garde-les en lieu sûr pour récupérer ton compte si tu oublies ton mot de passe.</p>
-        <ul className="recovery-codes">{codes.map(item => <li key={item}><code>{item}</code></li>)}</ul>
-        <button className="button practice-secondary" onClick={downloadCodes}>Télécharger les codes</button>
-        <Link to="/onboarding" className="button" replace>J’ai gardé mes codes</Link>
-      </div> : <form className="account-form" onSubmit={submit}>
-        <h1>{title}</h1>
-        {register && <p>Un pseudo et un mot de passe suffisent. Ton compte est gratuit.</p>}
-        <label>Pseudo<input autoComplete="username" required minLength={3} maxLength={24} pattern="[a-zA-Z0-9_]{3,24}"
-          value={username} onChange={event => { setUsername(event.target.value); setAvailability('') }} /></label>
-        {register && <div className="account-inline">
-          <button type="button" className="text-link" disabled={!/^[a-z0-9_]{3,24}$/i.test(username.trim())}
-            onClick={checkUsername}>Vérifier le pseudo</button>
-          <span role="status">{availability}</span>
-        </div>}
-        {recover && <label>Code de récupération<input autoComplete="one-time-code" required value={code} onChange={event => setCode(event.target.value)} /></label>}
-        <PasswordField label={recover ? 'Nouveau mot de passe' : 'Mot de passe'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          required minLength={10} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} />
-        {mode !== 'login' && <PasswordField label="Confirme le mot de passe" required minLength={10} maxLength={128}
-          autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} />}
+      {sent ? <div className="account-form">
+        <h1>Vérifie ta boîte mail.</h1>
+        <p role="status">{sent}</p>
+        <p>Pense à regarder dans tes spams. Le lien est valable une heure.</p>
         {error && <p role="alert" className="practice-error">{error}</p>}
-        <button type="submit" className="button" disabled={busy}>{busy ? 'Un instant…' : register ? 'Créer mon compte' : recover ? 'Changer mon mot de passe' : 'Se connecter'}</button>
+        {mode === 'register' && <button className="button practice-secondary" type="button" disabled={busy} onClick={resend}>Renvoyer l’email</button>}
+        <Link to="/login" className="text-link">Retour à la connexion</Link>
+      </div> : <form className="account-form" onSubmit={submit}>
+        <h1>{authTitles[mode]}</h1>
+        {mode === 'register' && <p>Ton adresse email et un mot de passe suffisent. Ton compte est gratuit.</p>}
+        {mode === 'recover' && <p>Entre ton adresse email : on t’envoie un lien pour choisir un nouveau mot de passe.</p>}
+        {mode !== 'reset' && <label>Adresse email<input type="email" autoComplete="email" inputMode="email" required maxLength={254}
+          value={email} onChange={event => setEmail(event.target.value)} /></label>}
+        {mode !== 'recover' && ready && <PasswordField label={mode === 'reset' ? 'Nouveau mot de passe' : 'Mot de passe'}
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={mode === 'login' ? 1 : 10} maxLength={128}
+          value={password} onChange={event => setPassword(event.target.value)} />}
+        {choosing && ready && <PasswordField label="Confirme le mot de passe" required minLength={10} maxLength={128}
+          autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} />}
+        {mode === 'reset' && !ready && !error && <p role="status">Vérification du lien…</p>}
+        {error && <p role="alert" className="practice-error">{error}</p>}
+        {unconfirmed && <button type="button" className="text-link" disabled={busy || !address} onClick={resend}>Renvoyer l’email de confirmation</button>}
+        {ready && <button type="submit" className="button" disabled={busy}>{busy ? 'Un instant…' : authActions[mode]}</button>}
         <div className="account-inline">
-          {mode === 'login' ? <><Link to="/register">Créer un compte</Link><Link to="/recover">Récupérer mon compte</Link></> : <Link to="/login">Se connecter</Link>}
+          {mode === 'login' ? <><Link to="/register">Créer un compte</Link><Link to="/recover">Mot de passe oublié ?</Link></> : <Link to="/login">Se connecter</Link>}
+          {mode === 'reset' && error && <Link to="/recover">Demander un nouveau lien</Link>}
           <Link to="/confidentialite">Confidentialité</Link>
         </div>
       </form>}
     </div>
   </main>
+}
+
+export function AuthCallback() {
+  const finish = useFinishSession()
+  const [error, setError] = useState(() => linkError())
+
+  useEffect(() => {
+    if (error) return
+    let active = true
+    let started = false
+    function open(token: string) {
+      if (started) return
+      started = true
+      finish(token).catch(reason => { if (active) setError(errorMessage(reason)) })
+    }
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => { if (session) open(session.access_token) })
+    void supabase.auth.getSession().then(({ data: current }) => { if (current.session) open(current.session.access_token) })
+    const timer = window.setTimeout(() => {
+      if (active && !started) setError('Ce lien n’est pas valide ou a expiré. Connecte-toi pour recevoir un nouveau lien.')
+    }, 6000)
+    return () => { active = false; data.subscription.unsubscribe(); window.clearTimeout(timer) }
+  }, [])
+
+  return <main id="main" className="wrap account-shell"><div className="account-card"><div className="account-form">
+    <h1>{error ? 'Lien invalide.' : 'Adresse confirmée !'}</h1>
+    {error ? <><p role="alert" className="practice-error">{error}</p><Link to="/login" className="button">Se connecter</Link></>
+      : <p role="status">Ouverture de ton espace…</p>}
+  </div></div></main>
 }
 
 export function RequireAccount({ onboarding = false }: { onboarding?: boolean }) {
@@ -200,7 +277,7 @@ export function Onboarding() {
 
 const navigation = [
   ['Dashboard', 'dashboard', LayoutDashboard], ['AI Tutor', 'tutor', MessageCircle],
-  ['Speaking Practice', 'speaking', Mic], ['My Vocabulary', 'vocabulary', BookOpen],
+  ['My Vocabulary', 'vocabulary', BookOpen],
   ['My Progress', 'progress', ChartNoAxesColumn], ['Settings', 'settings', Settings],
 ] as const
 
@@ -244,6 +321,7 @@ export function AppLayout() {
     setBusy(true)
     try {
       await accountApi('logout', {})
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
       setAccount(null)
       navigate('/login', { replace: true })
     } catch (reason) { setError(errorMessage(reason)) }
@@ -280,18 +358,17 @@ export function Dashboard({ progress = false }: { progress?: boolean }) {
     return () => controller.abort()
   }, [])
   return <section className="app-page">
-    <h1 lang="en">{progress ? 'My Progress' : `Welcome back, ${account?.username}!`}</h1>
+    <h1 lang="en">{progress ? 'My Progress' : `Welcome back, ${account?.username.split('@')[0]}!`}</h1>
     {!progress && preferences && <article className="app-daily">
       <h2 lang="en">Ready for your {preferences.dailyMinutes}-minute English practice?</h2>
       <p lang="en">{levels.find(([key]) => key === preferences.level)?.[1]} · {goals.find(([key]) => key === preferences.goal)?.[1]}</p>
-      <Link to={preferences.mode === 'voice' ? '/app/speaking' : '/app/tutor'} className="button">Démarrer ma séance</Link>
+      <Link to="/app/tutor" className="button">Démarrer ma séance</Link>
     </article>}
     {error && <p role="alert" className="practice-error">{error}</p>}
     {!stats && !error && <p role="status">Chargement de tes statistiques…</p>}
     {stats && <>
       <dl className="app-stats">
         <div><dt>Pratique vocale</dt><dd>{duration(stats.seconds)}</dd></div>
-        <div><dt>Conversations</dt><dd>{stats.conversations}</dd></div>
         <div><dt>Mots enregistrés</dt><dd>{stats.words}</dd></div>
         <div><dt>Messages</dt><dd>{stats.messages}</dd></div>
       </dl>
@@ -371,6 +448,7 @@ export function AccountSettings() {
     setError('')
     try {
       await accountApi('delete-account', { password })
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
       setAccount(null)
       navigate('/', { replace: true })
     } catch (reason) { setError(errorMessage(reason)) }

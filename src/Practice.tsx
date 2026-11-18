@@ -1,12 +1,36 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
-import { ArrowLeft, CheckCheck, Headphones, Lightbulb, Mic, MessageSquarePlus, Pause, Play, Send, Square, Trash2 } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { ArrowLeft, CheckCheck, Headphones, Lightbulb, Mic, Pause, Play, Send, Square, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { accountApi, errorMessage } from './account'
 
-type Turn = { id: string; message: string; reply: string; seconds: number; audio?: string | null; created_at?: string; at?: number; clip?: string }
+type Turn = { id: string; message: string; reply: string; seconds: number; audio?: string | null; created_at?: string; at?: number; clip?: string; mode?: 'text' | 'voice' }
 type Conversation = { id: string; title: string; mode: 'text' | 'voice'; updated_at: string }
 type TurnResult = { turn: Turn; audio: string | null }
 const starters = ['Tell me about your weekend.', 'Help me practice for a job interview.', 'How do I use the present perfect?']
+
+function stamp(turn: Turn) {
+  const value = turn.at ?? (turn.created_at ? Date.parse(turn.created_at) : NaN)
+  return Number.isFinite(value) ? value : 0
+}
+
+function chronological(list: Turn[]) {
+  const unique = new Map<string, Turn>()
+  list.forEach(turn => unique.set(turn.id, { ...unique.get(turn.id), ...turn }))
+  return [...unique.values()].sort((a, b) => stamp(a) - stamp(b))
+}
+
+function dayLabel(turn: Turn) {
+  const value = stamp(turn)
+  if (!value) return ''
+  const date = new Date(value)
+  const today = new Date()
+  const days = Math.round((new Date(today.toDateString()).getTime() - new Date(date.toDateString()).getTime()) / 86400000)
+  if (days === 0) return 'Aujourd’hui'
+  if (days === 1) return 'Hier'
+  const label = date.toLocaleDateString('fr-FR', { weekday: days < 7 ? 'long' : undefined, day: 'numeric', month: 'long',
+    year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
 
 function clock(turn: Turn) {
   const date = turn.at ? new Date(turn.at) : turn.created_at ? new Date(turn.created_at) : null
@@ -64,20 +88,18 @@ function encodeAudio(blob: Blob) {
   })
 }
 
-export default function Practice({ voice = false }: { voice?: boolean }) {
+export default function Practice() {
   const [draft, setDraft] = useState('')
   const [turns, setTurns] = useState<Turn[]>([])
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [selected, setSelected] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [more, setMore] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [older, setOlder] = useState(false)
   const [audioPending, setAudioPending] = useState<string[]>([])
   const [state, setState] = useState<'idle' | 'permission' | 'recording' | 'sending'>('idle')
   const [error, setError] = useState('')
   const [clip, setClip] = useState<{ data: Blob; url: string; seconds: number } | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const clipUrls = useRef<string[]>([])
-  const conversation = useRef('')
+  const conversation = useRef<{ text: string; voice: string }>({ text: '', voice: '' })
   const retry = useRef('')
   const recorder = useRef<MediaRecorder | null>(null)
   const stream = useRef<MediaStream | null>(null)
@@ -86,15 +108,28 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
   const request = useRef<AbortController | null>(null)
   const stopTimer = useRef<number | undefined>(undefined)
   const end = useRef<HTMLDivElement>(null)
-  const mode = voice ? 'voice' : 'text'
+  const thread = useRef<HTMLDivElement>(null)
+  const chain = useRef<Conversation[]>([])
+  const cursor = useRef<{ index: number; more: boolean; oldest?: string }>({ index: -1, more: false })
+  const keepScroll = useRef<{ height: number; top: number } | null>(null)
+  const loadingOlder = useRef(false)
+  const [sendingVoice, setSendingVoice] = useState(false)
   const lastTurn = turns.at(-1)?.id
 
   useEffect(() => {
     mount.current = true
     const historyController = new AbortController()
     accountApi<{ conversations: Conversation[] }>('conversations', undefined, historyController.signal)
-      .then(result => setConversations(result.conversations.filter(entry => entry.mode === mode)))
+      .then(result => {
+        chain.current = result.conversations
+        conversation.current = {
+          text: result.conversations.find(entry => entry.mode === 'text')?.id || '',
+          voice: result.conversations.find(entry => entry.mode === 'voice')?.id || '',
+        }
+        return loadOlder(historyController.signal, 20)
+      })
       .catch(reason => { if (!historyController.signal.aborted) setError(errorMessage(reason)) })
+      .finally(() => { if (!historyController.signal.aborted) setLoading(false) })
     return () => {
       mount.current = false
       historyController.abort()
@@ -104,7 +139,7 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
       stream.current?.getTracks().forEach(track => track.stop())
       request.current?.abort()
     }
-  }, [mode])
+  }, [])
 
   useEffect(() => () => { clipUrls.current.forEach(url => URL.revokeObjectURL(url)) }, [])
 
@@ -118,6 +153,13 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
   useEffect(() => {
     if (lastTurn || state === 'sending') end.current?.scrollIntoView({ block: 'nearest' })
   }, [lastTurn, state])
+
+  useLayoutEffect(() => {
+    const element = thread.current
+    if (!element || !keepScroll.current) return
+    element.scrollTop = element.scrollHeight - keepScroll.current.height + keepScroll.current.top
+    keepScroll.current = null
+  }, [turns])
 
   useEffect(() => {
     if (state !== 'recording') return
@@ -190,25 +232,21 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
-    if (state !== 'idle' || loading || (voice ? !clip : !text)) return
+    if (state !== 'idle' || loading || (!clip && !text)) return
+    const mode = clip ? 'voice' : 'text'
     setError('')
+    setSendingVoice(mode === 'voice')
     setState('sending')
     const controller = new AbortController()
     request.current = controller
     const timeout = window.setTimeout(() => controller.abort(), 90000)
     try {
-      const conversationId = conversation.current ||= crypto.randomUUID()
+      const conversationId = conversation.current[mode] ||= crypto.randomUUID()
       const turnId = retry.current ||= crypto.randomUUID()
       const message = clip ? { audio: await encodeAudio(clip.data), mimeType: clip.data.type, seconds: clip.seconds } : { text }
       const result = await accountApi<TurnResult>('turn', { conversationId, turnId, mode, ...message }, controller.signal)
       if (!mount.current) return
-      setTurns(previous => [...previous.filter(turn => turn.id !== result.turn.id), { ...result.turn, audio: result.audio, at: Date.now(), clip: clip?.url }])
-      setConversations(previous => {
-        const item = previous.find(entry => entry.id === conversationId)
-        return [{ id: conversationId, title: item?.title || result.turn.message.slice(0, 72), mode, updated_at: new Date().toISOString() },
-          ...previous.filter(entry => entry.id !== conversationId)]
-      })
-      setSelected(conversationId)
+      setTurns(previous => chronological([...previous, { ...result.turn, audio: result.audio, at: Date.now(), clip: clip?.url, mode }]))
       retry.current = ''
       if (clip) setClip(null)
       else setDraft('')
@@ -222,44 +260,44 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
     }
   }
 
-  function reset() {
-    conversation.current = ''
-    retry.current = ''
-    setSelected('')
-    setMore(false)
-    setTurns([])
-    setDraft('')
-    setClip(null)
-    setError('')
+  async function loadOlder(signal?: AbortSignal, minimum = 1) {
+    if (loadingOlder.current) return
+    loadingOlder.current = true
+    try {
+      let { index, more, oldest } = cursor.current
+      const gathered: Turn[] = []
+      while (gathered.length < minimum) {
+        if (index < 0 || !more) {
+          index += 1
+          oldest = undefined
+          if (index >= chain.current.length) { index = chain.current.length; more = false; break }
+        }
+        const entry = chain.current[index]
+        const query = `turns?conversation=${encodeURIComponent(entry.id)}${oldest ? `&before=${encodeURIComponent(oldest)}` : ''}`
+        const result = await accountApi<{ turns: Turn[]; more: boolean }>(query, undefined, signal)
+        gathered.push(...result.turns.map(turn => ({ ...turn, mode: entry.mode })))
+        more = result.more && result.turns.length > 0
+        oldest = result.turns[0]?.id ?? oldest
+      }
+      if (signal?.aborted || !mount.current) return
+      cursor.current = { index, more, oldest }
+      setOlder(more || index < chain.current.length - 1)
+      if (gathered.length) setTurns(previous => chronological([...gathered, ...previous]))
+    } finally { loadingOlder.current = false }
   }
 
-  async function openConversation(id: string) {
-    if (state !== 'idle' || loading) return
-    if (!id) { reset(); return }
+  async function showOlder() {
+    if (!older || loading || loadingOlder.current) return
+    const element = thread.current
     setLoading(true)
     setError('')
     try {
-      const result = await accountApi<{ turns: Turn[]; more: boolean }>(`turns?conversation=${encodeURIComponent(id)}`)
-      reset()
-      conversation.current = id
-      setSelected(id)
-      setTurns(result.turns)
-      setMore(result.more)
-    } catch (reason) { setError(errorMessage(reason)) }
-    finally { setLoading(false) }
-  }
-
-  async function loadOlder() {
-    if (!selected || !turns[0] || state !== 'idle' || loading) return
-    setLoading(true)
-    setError('')
-    try {
-      const result = await accountApi<{ turns: Turn[]; more: boolean }>(
-        `turns?conversation=${encodeURIComponent(selected)}&before=${encodeURIComponent(turns[0].id)}`)
-      setTurns(previous => [...result.turns, ...previous])
-      setMore(result.more)
-    } catch (reason) { setError(errorMessage(reason)) }
-    finally { setLoading(false) }
+      if (element) keepScroll.current = { height: element.scrollHeight, top: element.scrollTop }
+      await loadOlder(undefined, 15)
+    } catch (reason) {
+      keepScroll.current = null
+      setError(errorMessage(reason))
+    } finally { setLoading(false) }
   }
 
   async function play(turnId: string) {
@@ -272,49 +310,45 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
     finally { setAudioPending(previous => previous.filter(id => id !== turnId)) }
   }
 
-  const status = state === 'sending' ? (voice ? 'écoute ton vocal…' : 'écrit…') : state === 'recording' ? 't’écoute…' : 'en ligne'
+  const status = state === 'sending' ? (sendingVoice ? 'écoute ton vocal…' : 'écrit…') : state === 'recording' ? 't’écoute…' : 'en ligne'
   const busy = state !== 'idle' || loading
-  const canSend = voice ? !!clip : !!draft.trim()
+  const typing = !!draft.trim()
 
   return <section className="practice">
     <header className="practice-header">
-      <h1 lang="en">{voice ? 'Speaking Practice' : 'AI Tutor'}</h1>
-      <p>{voice ? 'Parle en anglais, puis écoute la réponse de Nova.' : 'Écris en anglais et reçois des corrections expliquées en français.'}</p>
+      <h1 lang="en">AI Tutor</h1>
+      <p>Écris ou envoie un vocal en anglais, et reçois des corrections expliquées en français.</p>
     </header>
     <section className="wa-chat" aria-label="Conversation avec Nova">
       <div className="wa-bar">
         <Link className="wa-icon wa-back-mobile" to="/app/dashboard" aria-label="Retour au menu"><ArrowLeft size={20} /></Link>
-        {selected && <button type="button" className="wa-icon wa-back-desktop" aria-label="Nouvelle conversation" disabled={busy} onClick={reset}><ArrowLeft size={20} /></button>}
         <img className="wa-avatar" src="/mate.svg" alt="" width="40" height="40" />
         <div className="wa-contact">
           <strong>Nova</strong>
           <small className={state !== 'idle' ? 'wa-live' : ''} aria-live="polite">{status}</small>
         </div>
-        <label className="wa-history"><span className="sr-only">Historique</span>
-          <select value={selected} disabled={busy} onChange={event => openConversation(event.target.value)}>
-            <option value="">Historique…</option>
-            {conversations.map(entry => <option key={entry.id} value={entry.id}>{entry.title}</option>)}
-          </select>
-        </label>
-        <button type="button" className="wa-icon" aria-label="Nouvelle conversation" title="Nouvelle conversation" disabled={busy} onClick={reset}>
-          <MessageSquarePlus size={20} /></button>
       </div>
-      <div className="wa-thread" role="log" aria-label="Messages">
-        {more && <button className="wa-chip wa-chip-button" type="button" disabled={busy} onClick={loadOlder}>Afficher les messages précédents</button>}
+      <div className="wa-thread" role="log" aria-label="Messages" ref={thread}
+        onScroll={event => { if (event.currentTarget.scrollTop < 60 && older && !loading) showOlder() }}>
+        {older && !loading && <button className="wa-chip wa-chip-button" type="button" onClick={showOlder}>Afficher les messages précédents</button>}
         {loading && <p className="wa-chip" role="status">Chargement de la conversation…</p>}
-        <p className="wa-chip wa-chip-info">🔒 Tes messages servent uniquement à ta pratique avec Nova.</p>
+        {!older && !loading && <p className="wa-chip wa-chip-info">🔒 Tes messages servent uniquement à ta pratique avec Nova.</p>}
         {!turns.length && !loading && <div className="wa-bubble wa-in wa-tail"><p lang="en">Hi, I’m Nova! 👋 What would you like to talk about today?</p></div>}
-        {turns.map(turn => {
+        {turns.map((turn, position) => {
+          const day = dayLabel(turn)
+          const newDay = day && day !== dayLabel(turns[position - 1] ?? {} as Turn)
+          const spoken = turn.mode === 'voice'
           const separator = turn.reply.match(/💬\s*(?:Nova)?\s*[:\n\-–]?/i)
           const corrections = separator?.index === undefined ? '' : turn.reply.slice(0, separator.index).replace(/^💡\s*Corrections(?:\s*&\s*Conseils)?\s*:\s*/i, '').trim()
           const answer = separator?.index === undefined ? turn.reply : turn.reply.slice(separator.index + separator[0].length).trim()
           const time = clock(turn)
           return <div className="wa-turn" key={turn.id}>
+            {newDay && <p className="wa-chip wa-day">{day}</p>}
             <div className="wa-bubble wa-out wa-tail">
-              {voice && (turn.clip
+              {spoken && (turn.clip
                 ? <VoiceNote src={turn.clip} seconds={turn.seconds} label="Réécouter ton vocal" />
                 : <span className="wa-voice-label"><Mic size={14} aria-hidden="true" /> Message vocal{turn.seconds ? ` · ${duration(turn.seconds)}` : ''}</span>)}
-              {voice ? <p className="wa-transcript"><small>Transcription</small>{turn.message}</p> : <p>{turn.message}</p>}
+              {spoken ? <p className="wa-transcript"><small>Transcription</small>{turn.message}</p> : <p>{turn.message}</p>}
               <span className="wa-meta">{time}<CheckCheck size={16} className="wa-read" aria-label="Lu" /></span>
             </div>
             <div className="wa-bubble wa-in wa-tail">
@@ -327,12 +361,12 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
             </div>
           </div>
         })}
-        {state === 'sending' && <div className="wa-bubble wa-in wa-tail wa-typing" role="status" aria-label={voice ? 'Nova écoute ton vocal' : 'Nova écrit'}>
+        {state === 'sending' && <div className="wa-bubble wa-in wa-tail wa-typing" role="status" aria-label={sendingVoice ? 'Nova écoute ton vocal' : 'Nova écrit'}>
           <span /><span /><span /></div>}
         <div ref={end} />
       </div>
       <form className="wa-composer" onSubmit={send}>
-        {!voice && !turns.length && !draft && <div className="wa-suggestions">
+        {!turns.length && !draft && !clip && state === 'idle' && <div className="wa-suggestions">
           {starters.map(text => <button type="button" disabled={busy} key={text} onClick={() => setDraft(text)}>{text}</button>)}
         </div>}
         {state === 'permission' && <p className="wa-hint" role="status">En attente de l’autorisation du micro… <button type="button" onClick={() => {
@@ -346,20 +380,18 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
               <button className="wa-icon wa-trash" type="button" aria-label="Supprimer le vocal" disabled={state !== 'idle'} onClick={discardClip}><Trash2 size={19} /></button>
               <VoiceNote src={clip.url} seconds={clip.seconds} label="Réécouter ton vocal avant de l’envoyer" />
             </div> : state === 'recording' ? <p className="wa-recording" role="status"><span className="wa-dot" /> {duration(elapsed)} <small>· max 0:45</small></p>
-              : voice ? <p className="wa-placeholder">Appuie sur le micro pour parler en anglais</p>
               : <textarea id="practice-message" aria-label="Ton message" value={draft} disabled={busy} placeholder="Write something in English…" rows={1} maxLength={1500}
                 onChange={event => { retry.current = ''; setDraft(event.target.value) }}
                 onKeyDown={event => {
                   if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() }
                 }} />}
           </div>
-          {voice && !clip
-            ? state === 'recording'
-              ? <button className="wa-send wa-stop" type="button" aria-label="Arrêter l’enregistrement" onClick={() => recorder.current?.stop()}><Square size={18} fill="currentColor" /></button>
-              : <button className="wa-send" type="button" aria-label="Enregistrer un vocal" disabled={busy} onClick={startRecording}><Mic size={22} /></button>
-            : <button className="wa-send" type="submit" aria-label="Envoyer" disabled={busy || !canSend}><Send size={20} /></button>}
+          {state === 'recording'
+            ? <button className="wa-send wa-stop" type="button" aria-label="Arrêter l’enregistrement" onClick={() => recorder.current?.stop()}><Square size={18} fill="currentColor" /></button>
+            : clip || typing
+              ? <button className="wa-send" type="submit" aria-label="Envoyer" disabled={busy}><Send size={20} /></button>
+              : <button className="wa-send" type="button" aria-label="Enregistrer un vocal" disabled={busy} onClick={startRecording}><Mic size={22} /></button>}
         </div>
-        {voice && <Link className="wa-switch" to="/app/tutor">Continuer à l’écrit</Link>}
       </form>
     </section>
   </section>
