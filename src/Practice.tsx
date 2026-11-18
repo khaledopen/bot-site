@@ -1,12 +1,58 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { ArrowLeft, CheckCheck, Headphones, Lightbulb, Mic, Pause, Play, Send, Square, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { accountApi, errorMessage } from './account'
+import { accountApi, ApiError, errorMessage, levels, type Account, type Preferences } from './account'
+import { useAccount } from './AccountPages'
 
-type Turn = { id: string; message: string; reply: string; seconds: number; audio?: string | null; created_at?: string; at?: number; clip?: string; mode?: 'text' | 'voice' }
-type Conversation = { id: string; title: string; mode: 'text' | 'voice'; updated_at: string }
+type Level = Preferences['level']
+type Turn = { id: string; message: string; reply: string; seconds: number; audio?: string | null; created_at?: string; at?: number; clip?: string; mode?: 'text' | 'voice'; level?: Level | null; has_voice?: boolean }
+type Conversation = { id: string; title: string; mode: 'text' | 'voice'; level: Level | null; updated_at: string }
 type TurnResult = { turn: Turn; audio: string | null }
 const starters = ['Tell me about your weekend.', 'Help me practice for a job interview.', 'How do I use the present perfect?']
+const levelNames: Record<Level, string> = { beginner: 'Débutant', intermediate: 'Intermédiaire', advanced: 'Avancé' }
+
+// Les parties fautives arrivent entre ⟦ ⟧ : on les surligne
+function marked(text: string) {
+  return text.split(/(⟦[^⟧]*⟧)/u).map((part, index) => part.startsWith('⟦') && part.endsWith('⟧')
+    ? <mark key={index} className="wa-err">{part.slice(1, -1)}</mark> : part)
+}
+
+function NovaLines({ text }: { text: string }) {
+  return <>{text.split('\n').map((line, index) => {
+    const value = line.trim()
+    if (!value) return <span key={index} className="wa-gap" aria-hidden="true" />
+    if (value.startsWith('🇫🇷')) return <p key={index} lang="fr" className="wa-translation">{value.replace(/^🇫🇷\s*/u, '')}</p>
+    if (value.startsWith('👉')) return <p key={index} lang="fr" className="wa-model">{value.replace(/^👉\s*/u, '')}</p>
+    if (value.startsWith('🎯')) return <p key={index} lang="fr" className="wa-challenge">{marked(value)}</p>
+    if (value.startsWith('🔊')) return <p key={index} lang="en" className="wa-say">{value.replace(/^🔊\s*/u, '')}</p>
+    if (/^💡\s*Indice/u.test(value)) return <p key={index} lang="fr" className="wa-clue">{value}</p>
+    return <p key={index} lang="en">{marked(value)}</p>
+  })}</>
+}
+
+function CorrectionLines({ text }: { text: string }) {
+  return <>{text.split('\n').map((line, index) => {
+    const value = line.trim()
+    if (!value) return null
+    if (value.startsWith('📍')) return <p key={index} className="wa-where">{marked(value)}</p>
+    if (value.startsWith('✍️')) return <p key={index} className="wa-fixed">{marked(value)}</p>
+    if (value.startsWith('✅')) return <p key={index} className="wa-fixed">{marked(value)}</p>
+    if (value.startsWith('🎯')) return <p key={index} className="wa-result">{marked(value)}</p>
+    return <p key={index}>{marked(value)}</p>
+  })}</>
+}
+
+function LevelOpener({ level, opener }: { level: Level; opener?: string }) {
+  const body = (opener || '').split('\n').slice(1).join('\n').trim()
+  const [intro, english] = body.includes('💬') ? [body.slice(0, body.indexOf('💬')), body.slice(body.indexOf('💬')).replace(/^💬\s*Nova\s*:?/u, '')] : ['', body]
+  return <div className="wa-turn">
+    <p className="wa-chip wa-level-chip">🔄 Nouvelle conversation · Niveau {levelNames[level]}</p>
+    {body && <div className="wa-bubble wa-in wa-tail">
+      {intro.trim() && <p lang="fr" className="wa-note">{intro.trim()}</p>}
+      <div className="wa-answer"><NovaLines text={english.trim()} /></div>
+    </div>}
+  </div>
+}
 
 function stamp(turn: Turn) {
   const value = turn.at ?? (turn.created_at ? Date.parse(turn.created_at) : NaN)
@@ -42,13 +88,14 @@ function duration(seconds: number) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
 
-function VoiceNote({ src, seconds = 0, label }: { src: string; seconds?: number; label: string }) {
+function VoiceNote({ src, seconds = 0, label, autoPlay = false }: { src: string; seconds?: number; label: string; autoPlay?: boolean }) {
   const audio = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [time, setTime] = useState(0)
   const [length, setLength] = useState(0)
   const total = length || seconds
   const readLength = (element: HTMLAudioElement) => { if (Number.isFinite(element.duration) && element.duration > 0) setLength(element.duration) }
+  useEffect(() => { if (autoPlay) audio.current?.play().catch(() => {}) }, [autoPlay])
 
   function toggle() {
     const element = audio.current
@@ -89,6 +136,11 @@ function encodeAudio(blob: Blob) {
 }
 
 export default function Practice() {
+  const { account, setAccount } = useAccount()
+  const level: Level = account?.preferences?.level ?? 'intermediate'
+  const [openers, setOpeners] = useState<Partial<Record<Level, string>>>({})
+  const [voicePending, setVoicePending] = useState<string[]>([])
+  const [switching, setSwitching] = useState(false)
   const [draft, setDraft] = useState('')
   const [turns, setTurns] = useState<Turn[]>([])
   const [loading, setLoading] = useState(true)
@@ -119,12 +171,16 @@ export default function Practice() {
   useEffect(() => {
     mount.current = true
     const historyController = new AbortController()
-    accountApi<{ conversations: Conversation[] }>('conversations', undefined, historyController.signal)
+    accountApi<{ conversations: Conversation[]; openers?: Partial<Record<Level, string>> }>('conversations', undefined, historyController.signal)
       .then(result => {
         chain.current = result.conversations
+        setOpeners(result.openers ?? {})
+        // On ne reprend que les conversations ouvertes depuis le dernier changement de niveau
+        const boundary = Math.max(0, ...result.conversations.filter(entry => entry.level && entry.level !== level).map(entry => Date.parse(entry.updated_at) || 0))
+        const current = result.conversations.filter(entry => (entry.level ?? level) === level && (Date.parse(entry.updated_at) || 0) > boundary)
         conversation.current = {
-          text: result.conversations.find(entry => entry.mode === 'text')?.id || '',
-          voice: result.conversations.find(entry => entry.mode === 'voice')?.id || '',
+          text: current.find(entry => entry.mode === 'text')?.id || '',
+          voice: current.find(entry => entry.mode === 'voice')?.id || '',
         }
         return loadOlder(historyController.signal, 20)
       })
@@ -248,12 +304,14 @@ export default function Practice() {
       const message = clip ? { audio: await encodeAudio(clip.data), mimeType: clip.data.type, seconds: clip.seconds } : { text }
       const result = await accountApi<TurnResult>('turn', { conversationId, turnId, mode, ...message }, controller.signal)
       if (!mount.current) return
-      setTurns(previous => chronological([...previous, { ...result.turn, audio: result.audio, at: Date.now(), clip: clip?.url, mode }]))
+      setTurns(previous => chronological([...previous, { ...result.turn, audio: result.audio, at: Date.now(), clip: clip?.url, mode, level }]))
       retry.current = ''
       if (clip) setClip(null)
       else setDraft('')
     } catch (reason) {
       if (mount.current) {
+        // Le niveau a changé ailleurs (réglages, autre appareil) : la prochaine phrase ouvrira une nouvelle conversation
+        if (reason instanceof ApiError && reason.status === 409 && /niveau/i.test(reason.message)) conversation.current = { text: '', voice: '' }
         setError(errorMessage(reason))
       }
     } finally {
@@ -277,7 +335,7 @@ export default function Practice() {
         const entry = chain.current[index]
         const query = `turns?conversation=${encodeURIComponent(entry.id)}${oldest ? `&before=${encodeURIComponent(oldest)}` : ''}`
         const result = await accountApi<{ turns: Turn[]; more: boolean }>(query, undefined, signal)
-        gathered.push(...result.turns.map(turn => ({ ...turn, mode: entry.mode })))
+        gathered.push(...result.turns.map(turn => ({ ...turn, mode: entry.mode, level: entry.level ?? level })))
         more = result.more && result.turns.length > 0
         oldest = result.turns[0]?.id ?? oldest
       }
@@ -312,6 +370,31 @@ export default function Practice() {
     finally { setAudioPending(previous => previous.filter(id => id !== turnId)) }
   }
 
+  async function listenOwn(turnId: string) {
+    setVoicePending(previous => [...previous, turnId])
+    setError('')
+    try {
+      const { audio, type } = await accountApi<{ audio: string; type: string }>(`voice?turn=${encodeURIComponent(turnId)}`)
+      setTurns(previous => previous.map(turn => turn.id === turnId ? { ...turn, clip: `data:${type || 'audio/webm'};base64,${audio}`, autoPlay: true } as Turn : turn))
+    } catch (reason) { setError(errorMessage(reason)) }
+    finally { setVoicePending(previous => previous.filter(id => id !== turnId)) }
+  }
+
+  // Changer de niveau ouvre une nouvelle conversation, annoncée par Nova
+  async function changeLevel(next: Level) {
+    if (!account?.preferences || next === level || switching) return
+    setSwitching(true)
+    setError('')
+    try {
+      const result = await accountApi<{ account: Account }>('preferences', { ...account.preferences, level: next })
+      conversation.current = { text: '', voice: '' }
+      retry.current = ''
+      setAccount(result.account)
+      window.setTimeout(() => end.current?.scrollIntoView({ block: 'nearest' }), 50)
+    } catch (reason) { setError(errorMessage(reason)) }
+    finally { setSwitching(false) }
+  }
+
   const status = state === 'sending' ? (sendingVoice ? 'écoute ton vocal…' : 'écrit…') : state === 'recording' ? 't’écoute…' : 'en ligne'
   const busy = state !== 'idle' || loading
   const typing = !!draft.trim()
@@ -329,13 +412,19 @@ export default function Practice() {
           <strong>Nova</strong>
           <small className={state !== 'idle' ? 'wa-live' : ''} aria-live="polite">{status}</small>
         </div>
+        {account?.preferences && <label className="wa-level">
+          <span className="sr-only">Ton niveau</span>
+          <select value={level} disabled={busy || switching} onChange={event => changeLevel(event.target.value as Level)} aria-label="Changer de niveau">
+            {levels.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        </label>}
       </div>
       <div className="wa-thread" role="log" aria-label="Messages" ref={thread}
         onScroll={event => { if (event.currentTarget.scrollTop < 60 && older && !loading) showOlder() }}>
         {older && !loading && <button className="wa-chip wa-chip-button" type="button" onClick={showOlder}>Afficher les messages précédents</button>}
         {loading && <p className="wa-chip" role="status">Chargement de la conversation…</p>}
         {!older && !loading && <p className="wa-chip wa-chip-info">🔒 Tes messages servent uniquement à ta pratique avec Nova.</p>}
-        {!turns.length && !loading && <div className="wa-bubble wa-in wa-tail"><p lang="en">Hi, I’m Nova! 👋 What would you like to talk about today?</p></div>}
+
         {turns.map((turn, position) => {
           const day = dayLabel(turn)
           const newDay = day && day !== dayLabel(turns[position - 1] ?? {} as Turn)
@@ -344,24 +433,23 @@ export default function Practice() {
           const corrections = separator?.index === undefined ? '' : turn.reply.slice(0, separator.index).replace(/^💡\s*Corrections(?:\s*&\s*Conseils)?\s*:\s*/i, '').trim()
           const answer = separator?.index === undefined ? turn.reply : turn.reply.slice(separator.index + separator[0].length).trim()
           const time = clock(turn)
+          const previous = turns[position - 1]
+          const levelChanged = !!previous && !!turn.level && !!previous.level && turn.level !== previous.level
           return <div className="wa-turn" key={turn.id}>
             {newDay && <p className="wa-chip wa-day">{day}</p>}
+            {levelChanged && turn.level && <LevelOpener level={turn.level} opener={openers[turn.level]} />}
             <div className="wa-bubble wa-out wa-tail">
               {spoken && (turn.clip
-                ? <VoiceNote src={turn.clip} seconds={turn.seconds} label="Réécouter ton vocal" />
-                : <span className="wa-voice-label"><Mic size={14} aria-hidden="true" /> Message vocal{turn.seconds ? ` · ${duration(turn.seconds)}` : ''}</span>)}
+                ? <VoiceNote src={turn.clip} seconds={turn.seconds} label="Réécouter ton vocal" autoPlay={(turn as Turn & { autoPlay?: boolean }).autoPlay} />
+                : <span className="wa-voice-label"><Mic size={14} aria-hidden="true" /> Message vocal{turn.seconds ? ` · ${duration(turn.seconds)}` : ''}
+                  {turn.has_voice && <button type="button" className="wa-own-play" disabled={voicePending.includes(turn.id)} onClick={() => listenOwn(turn.id)}>
+                    <Play size={13} fill="currentColor" aria-hidden="true" />{voicePending.includes(turn.id) ? 'Chargement…' : 'Réécouter'}</button>}</span>)}
               {spoken ? <p className="wa-transcript"><small>Transcription</small>{turn.message}</p> : <p>{turn.message}</p>}
               <span className="wa-meta">{time}<CheckCheck size={16} className="wa-read" aria-label="Lu" /></span>
             </div>
             <div className="wa-bubble wa-in wa-tail">
-              {corrections && <div className="wa-quote"><strong><Lightbulb size={14} aria-hidden="true" /> Corrections</strong><p>{corrections}</p></div>}
-              <div className="wa-answer">{answer.split('\n').map((line, index) => {
-                const text = line.trim()
-                if (!text) return <span key={index} className="wa-gap" aria-hidden="true" />
-                if (text.startsWith('🇫🇷')) return <p key={index} lang="fr" className="wa-translation">{text.replace(/^🇫🇷\s*/u, '')}</p>
-                if (text.startsWith('👉')) return <p key={index} lang="fr" className="wa-model">{text.replace(/^👉\s*/u, '')}</p>
-                return <p key={index} lang="en">{text}</p>
-              })}</div>
+              {corrections && <div className="wa-quote"><strong><Lightbulb size={14} aria-hidden="true" /> Corrections</strong><CorrectionLines text={corrections} /></div>}
+              <div className="wa-answer"><NovaLines text={answer} /></div>
               {turn.audio ? <VoiceNote src={`data:audio/mpeg;base64,${turn.audio}`} label="Écouter la réponse de Nova" /> :
                 <button className="wa-listen" type="button" disabled={audioPending.includes(turn.id)} onClick={() => play(turn.id)}>
                   <Headphones size={15} aria-hidden="true" />{audioPending.includes(turn.id) ? 'Préparation…' : 'Écouter'}</button>}
@@ -369,6 +457,10 @@ export default function Practice() {
             </div>
           </div>
         })}
+        {!loading && (turns.at(-1)?.level ?? null) !== level && (turns.length
+          ? <LevelOpener level={level} opener={openers[level]} />
+          : <div className="wa-bubble wa-in wa-tail"><p lang="en">Hi, I’m Nova! 👋 What would you like to talk about today?</p>
+            <p lang="fr" className="wa-note">Niveau {levelNames[level]} · tu peux le changer en haut à droite.</p></div>)}
         {state === 'sending' && <div className="wa-bubble wa-in wa-tail wa-typing" role="status" aria-label={sendingVoice ? 'Nova écoute ton vocal' : 'Nova écrit'}>
           <span /><span /><span /></div>}
         <div ref={end} />

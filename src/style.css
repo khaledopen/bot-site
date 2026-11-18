@@ -467,3 +467,20 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 .wa-translation { color: #667781; font-style: italic; font-size: 13.5px; }
 .wa-translation::before { content: "FR · "; font-style: normal; font-weight: 700; font-size: 11px; color: #8696a0; }
 .wa-model { margin-top: 4px; padding: 6px 9px; border-radius: 8px; background: #e7f6f1; color: #10654a; font-size: 13.5px; font-weight: 600; }
+
+/* Niveau, erreurs surlignées et défis */
+.wa-level select { min-height: 34px; padding: 4px 10px; border-radius: 18px; border: 0; background: #ffffff26; color: #fff; font-size: 13px; font-weight: 600; }
+.wa-level option { color: #111b21; }
+.wa-level-chip { background: #e9edfc; color: #274cee; font-weight: 700; }
+.wa-note { color: #54656f; font-size: 13.5px; margin-bottom: 6px; }
+.wa-quote p + p { margin-top: 4px; }
+.wa-err { background: #ffd9d6; color: #b3261e; border-radius: 4px; padding: 0 3px; font-weight: 700; text-decoration: underline wavy #e5484d 1px; text-underline-offset: 3px; }
+.wa-where { color: #3b4a54; }
+.wa-fixed { margin-top: 6px !important; padding: 5px 8px; border-radius: 6px; background: #e3f7ec; color: #10654a; font-weight: 600; }
+.wa-result { margin-top: 8px !important; font-weight: 700; color: #274cee; }
+.wa-challenge { margin-top: 6px; padding: 8px 10px; border-radius: 8px; background: #eef1ff; border-left: 4px solid #274cee; color: #1b2a6b; font-weight: 600; }
+.wa-say { padding: 6px 10px; border-radius: 8px; background: #fff8e6; font-weight: 700; color: #111b21; }
+.wa-say::before { content: "🔊 "; }
+.wa-clue { color: #667781; font-size: 13px; font-style: italic; }
+.wa-own-play { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 3px 9px; border-radius: 12px; background: #c9f2d9; color: #10654a; font-size: 12px; font-weight: 700; }
+.wa-own-play:disabled { opacity: .6; }
