@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ArrowLeft, CheckCheck, Headphones, Lightbulb, Mic, MessageSquarePlus, Send, Square, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { ArrowLeft, CheckCheck, Headphones, Lightbulb, Mic, MessageSquarePlus, Pause, Play, Send, Square, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { accountApi, errorMessage } from './account'
 
-type Turn = { id: string; message: string; reply: string; seconds: number; audio?: string | null; created_at?: string; at?: number }
+type Turn = { id: string; message: string; reply: string; seconds: number; audio?: string | null; created_at?: string; at?: number; clip?: string }
 type Conversation = { id: string; title: string; mode: 'text' | 'voice'; updated_at: string }
 type TurnResult = { turn: Turn; audio: string | null }
 const starters = ['Tell me about your weekend.', 'Help me practice for a job interview.', 'How do I use the present perfect?']
@@ -16,6 +16,43 @@ function clock(turn: Turn) {
 function duration(seconds: number) {
   const total = Math.max(0, Math.round(seconds))
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+}
+
+function VoiceNote({ src, seconds = 0, label }: { src: string; seconds?: number; label: string }) {
+  const audio = useRef<HTMLAudioElement>(null)
+  const [playing, setPlaying] = useState(false)
+  const [time, setTime] = useState(0)
+  const [length, setLength] = useState(0)
+  const total = length || seconds
+  const readLength = (element: HTMLAudioElement) => { if (Number.isFinite(element.duration) && element.duration > 0) setLength(element.duration) }
+
+  function toggle() {
+    const element = audio.current
+    if (!element) return
+    if (element.paused) {
+      document.querySelectorAll('audio').forEach(other => { if (other !== element) other.pause() })
+      element.play().catch(() => setPlaying(false))
+    } else element.pause()
+  }
+
+  return <div className="wa-voice">
+    <button type="button" className="wa-voice-play" aria-label={playing ? 'Mettre en pause' : label} onClick={toggle}>
+      {playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button>
+    <input type="range" className="wa-voice-bar" min={0} max={total || 1} step={0.05} value={Math.min(time, total || 1)} aria-label="Position dans le vocal"
+      style={{ '--progress': `${total ? Math.min(100, time / total * 100) : 0}%` } as CSSProperties}
+      onChange={event => {
+        const element = audio.current
+        if (!element) return
+        element.currentTime = Number(event.target.value)
+        setTime(element.currentTime)
+      }} />
+    <span className="wa-voice-time">{duration(playing || time ? time : total)}</span>
+    <audio ref={audio} src={src} preload="metadata"
+      onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+      onEnded={() => { setPlaying(false); setTime(0) }}
+      onTimeUpdate={event => setTime(event.currentTarget.currentTime)}
+      onLoadedMetadata={event => readLength(event.currentTarget)} onDurationChange={event => readLength(event.currentTarget)} />
+  </div>
 }
 
 function encodeAudio(blob: Blob) {
@@ -39,6 +76,7 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
   const [error, setError] = useState('')
   const [clip, setClip] = useState<{ data: Blob; url: string; seconds: number } | null>(null)
   const [elapsed, setElapsed] = useState(0)
+  const clipUrls = useRef<string[]>([])
   const conversation = useRef('')
   const retry = useRef('')
   const recorder = useRef<MediaRecorder | null>(null)
@@ -68,9 +106,14 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
     }
   }, [mode])
 
-  useEffect(() => () => {
+  useEffect(() => () => { clipUrls.current.forEach(url => URL.revokeObjectURL(url)) }, [])
+
+  function discardClip() {
     if (clip) URL.revokeObjectURL(clip.url)
-  }, [clip])
+    setClip(null)
+    setError('')
+    retry.current = ''
+  }
 
   useEffect(() => {
     if (lastTurn || state === 'sending') end.current?.scrollIntoView({ block: 'nearest' })
@@ -114,7 +157,9 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
         const data = new Blob(chunks, { type: active.mimeType || mimeType })
         if (data.size > 0 && data.size <= 3 * 1024 * 1024) {
           retry.current = ''
-          setClip({ data, url: URL.createObjectURL(data), seconds: (performance.now() - started) / 1000 })
+          const url = URL.createObjectURL(data)
+          clipUrls.current.push(url)
+          setClip({ data, url, seconds: (performance.now() - started) / 1000 })
         }
         else setError('Cet enregistrement est vide ou trop volumineux. Essaie un vocal plus court.')
         setState('idle')
@@ -157,7 +202,7 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
       const message = clip ? { audio: await encodeAudio(clip.data), mimeType: clip.data.type, seconds: clip.seconds } : { text }
       const result = await accountApi<TurnResult>('turn', { conversationId, turnId, mode, ...message }, controller.signal)
       if (!mount.current) return
-      setTurns(previous => [...previous.filter(turn => turn.id !== result.turn.id), { ...result.turn, audio: result.audio, at: Date.now() }])
+      setTurns(previous => [...previous.filter(turn => turn.id !== result.turn.id), { ...result.turn, audio: result.audio, at: Date.now(), clip: clip?.url }])
       setConversations(previous => {
         const item = previous.find(entry => entry.id === conversationId)
         return [{ id: conversationId, title: item?.title || result.turn.message.slice(0, 72), mode, updated_at: new Date().toISOString() },
@@ -238,7 +283,8 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
     </header>
     <section className="wa-chat" aria-label="Conversation avec Nova">
       <div className="wa-bar">
-        {selected && <button type="button" className="wa-icon" aria-label="Nouvelle conversation" disabled={busy} onClick={reset}><ArrowLeft size={20} /></button>}
+        <Link className="wa-icon wa-back-mobile" to="/app/dashboard" aria-label="Retour au menu"><ArrowLeft size={20} /></Link>
+        {selected && <button type="button" className="wa-icon wa-back-desktop" aria-label="Nouvelle conversation" disabled={busy} onClick={reset}><ArrowLeft size={20} /></button>}
         <img className="wa-avatar" src="/mate.svg" alt="" width="40" height="40" />
         <div className="wa-contact">
           <strong>Nova</strong>
@@ -265,14 +311,16 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
           const time = clock(turn)
           return <div className="wa-turn" key={turn.id}>
             <div className="wa-bubble wa-out wa-tail">
-              {voice && <span className="wa-voice-label"><Mic size={14} aria-hidden="true" /> Message vocal{turn.seconds ? ` · ${duration(turn.seconds)}` : ''}</span>}
-              <p>{turn.message}</p>
+              {voice && (turn.clip
+                ? <VoiceNote src={turn.clip} seconds={turn.seconds} label="Réécouter ton vocal" />
+                : <span className="wa-voice-label"><Mic size={14} aria-hidden="true" /> Message vocal{turn.seconds ? ` · ${duration(turn.seconds)}` : ''}</span>)}
+              {voice ? <p className="wa-transcript"><small>Transcription</small>{turn.message}</p> : <p>{turn.message}</p>}
               <span className="wa-meta">{time}<CheckCheck size={16} className="wa-read" aria-label="Lu" /></span>
             </div>
             <div className="wa-bubble wa-in wa-tail">
               {corrections && <div className="wa-quote"><strong><Lightbulb size={14} aria-hidden="true" /> Corrections</strong><p>{corrections}</p></div>}
               <p lang="en">{answer}</p>
-              {turn.audio ? <audio controls preload="none" src={`data:audio/mpeg;base64,${turn.audio}`} aria-label="Réponse audio en anglais" /> :
+              {turn.audio ? <VoiceNote src={`data:audio/mpeg;base64,${turn.audio}`} label="Écouter la réponse de Nova" /> :
                 <button className="wa-listen" type="button" disabled={audioPending.includes(turn.id)} onClick={() => play(turn.id)}>
                   <Headphones size={15} aria-hidden="true" />{audioPending.includes(turn.id) ? 'Préparation…' : 'Écouter'}</button>}
               <span className="wa-meta">{time}</span>
@@ -293,10 +341,10 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
         }}>Annuler</button></p>}
         {error && <p className="practice-error wa-hint" role="alert">{error}</p>}
         <div className="wa-input-row">
-          <div className="wa-field">
+          <div className={`wa-field ${clip ? 'wa-field-clip' : ''}`}>
             {clip ? <div className="wa-preview">
-              <button className="wa-icon wa-trash" type="button" aria-label="Supprimer le vocal" disabled={state !== 'idle'} onClick={() => { setClip(null); setError(''); retry.current = '' }}><Trash2 size={19} /></button>
-              <audio controls src={clip.url} aria-label="Réécouter ton enregistrement" />
+              <button className="wa-icon wa-trash" type="button" aria-label="Supprimer le vocal" disabled={state !== 'idle'} onClick={discardClip}><Trash2 size={19} /></button>
+              <VoiceNote src={clip.url} seconds={clip.seconds} label="Réécouter ton vocal avant de l’envoyer" />
             </div> : state === 'recording' ? <p className="wa-recording" role="status"><span className="wa-dot" /> {duration(elapsed)} <small>· max 0:45</small></p>
               : voice ? <p className="wa-placeholder">Appuie sur le micro pour parler en anglais</p>
               : <textarea id="practice-message" aria-label="Ton message" value={draft} disabled={busy} placeholder="Write something in English…" rows={1} maxLength={1500}
