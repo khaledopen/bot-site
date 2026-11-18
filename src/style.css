@@ -330,3 +330,79 @@ h3 { font-size: 20px; font-weight: 700; letter-spacing: -.035em; line-height: 1.
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
+
+/* ===== Messagerie façon WhatsApp ===== */
+.wa-chat { display: flex; flex-direction: column; height: clamp(480px, 74dvh, 820px); border-radius: 18px; overflow: hidden; border: 1px solid #d1d7db; background: #efeae2; box-shadow: 0 10px 30px #0b141a14; }
+.wa-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #008069; color: white; }
+.wa-avatar { width: 40px; height: 40px; border-radius: 50%; background: #dff5e9; padding: 4px; flex-shrink: 0; }
+.wa-contact { display: grid; min-width: 0; margin-right: auto; line-height: 1.25; }
+.wa-contact strong { font-size: 16px; }
+.wa-contact small { font-size: 12.5px; color: #d9f2ec; }
+.wa-contact small.wa-live { color: #fff; font-style: italic; }
+.wa-history select { max-width: min(190px, 34vw); min-height: 36px; padding: 4px 8px; border-radius: 18px; border: 0; background: #ffffff26; color: white; font-size: 13px; text-overflow: ellipsis; }
+.wa-history option { color: #111b21; }
+.wa-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: inherit; flex-shrink: 0; }
+.wa-icon:hover:not(:disabled) { background: #ffffff1f; }
+.wa-thread { flex: 1; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; padding: 14px clamp(10px, 4vw, 56px) 10px;
+  background-color: #efeae2;
+  background-image: radial-gradient(#d6cfc4 1.1px, transparent 1.2px), radial-gradient(#e3ddd3 1.1px, transparent 1.2px);
+  background-size: 22px 22px; background-position: 0 0, 11px 11px; }
+.wa-turn { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.wa-chip { align-self: center; margin: 4px 0 8px; padding: 5px 12px; border-radius: 8px; background: #ffffffeb; color: #54656f; font-size: 12.5px; text-align: center; box-shadow: 0 1px .5px #0b141a21; }
+.wa-chip-info { background: #ffeecd; color: #54656f; max-width: 420px; }
+.wa-chip-button { font-weight: 600; color: #008069; }
+.wa-bubble { position: relative; max-width: min(78%, 560px); padding: 6px 9px 8px; border-radius: 8px; font-size: 14.5px; line-height: 1.42; color: #111b21; box-shadow: 0 1px .5px #0b141a21; overflow-wrap: anywhere; animation: wa-pop .18s ease-out; }
+.wa-bubble p { white-space: pre-wrap; line-height: 1.42; }
+.wa-in { align-self: flex-start; background: white; }
+.wa-out { align-self: flex-end; background: #d9fdd3; }
+.wa-in.wa-tail { border-top-left-radius: 0; }
+.wa-out.wa-tail { border-top-right-radius: 0; }
+.wa-tail::before { content: ""; position: absolute; top: 0; width: 8px; height: 13px; }
+.wa-in.wa-tail::before { left: -8px; background: white; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.wa-out.wa-tail::before { right: -8px; background: #d9fdd3; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.wa-meta { float: right; display: inline-flex; align-items: center; gap: 3px; margin: 6px 0 -4px 12px; font-size: 11px; color: #667781; line-height: 1; }
+.wa-read { color: #53bdeb; }
+.wa-voice-label { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; font-size: 12px; font-weight: 600; color: #1f7a52; }
+.wa-quote { margin: 0 0 6px; padding: 6px 9px; border-left: 4px solid #e9a23b; border-radius: 6px; background: #fff6e0; font-size: 13.5px; }
+.wa-quote strong { display: flex; align-items: center; gap: 4px; color: #b36b00; font-size: 12.5px; margin-bottom: 2px; }
+.wa-bubble audio { display: block; width: min(270px, 100%); height: 40px; margin-top: 6px; }
+.wa-listen { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 4px 10px; border-radius: 14px; background: #e7f6f1; color: #008069; font-size: 12.5px; font-weight: 600; }
+.wa-listen:hover:not(:disabled) { background: #d2efe6; }
+.wa-typing { display: flex; gap: 4px; padding: 13px 14px; }
+.wa-typing span { width: 7px; height: 7px; border-radius: 50%; background: #8696a0; animation: wa-dots 1.2s infinite ease-in-out; }
+.wa-typing span:nth-child(2) { animation-delay: .15s; }
+.wa-typing span:nth-child(3) { animation-delay: .3s; }
+.wa-composer { display: grid; gap: 6px; padding: 8px 10px 10px; background: #f0f2f5; }
+.wa-suggestions { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.wa-suggestions button { flex-shrink: 0; padding: 7px 12px; border-radius: 18px; background: white; border: 1px solid #d1d7db; color: #008069; font-size: 13px; font-weight: 600; }
+.wa-suggestions button:hover:not(:disabled) { background: #e7f6f1; }
+.wa-hint { font-size: 13px; padding: 0 6px; color: #54656f; }
+.wa-hint button { font-weight: 700; color: #008069; margin-left: 6px; }
+.wa-input-row { display: flex; align-items: flex-end; gap: 8px; }
+.wa-field { flex: 1; min-width: 0; display: flex; align-items: center; min-height: 46px; padding: 4px 16px; border-radius: 24px; background: white; }
+.wa-field textarea { width: 100%; max-height: 120px; padding: 9px 0; border: 0; outline: 0; resize: none; background: transparent; font-size: 15px; line-height: 1.4; field-sizing: content; }
+.wa-placeholder { color: #8696a0; font-size: 14px; }
+.wa-recording { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-size: 15px; color: #111b21; }
+.wa-recording small { color: #8696a0; }
+.wa-dot { width: 10px; height: 10px; border-radius: 50%; background: #ea0038; animation: wa-blink 1s infinite; }
+.wa-preview { display: flex; align-items: center; gap: 6px; width: 100%; margin-left: -10px; }
+.wa-preview audio { flex: 1; min-width: 0; height: 38px; }
+.wa-trash { color: #8696a0; }
+.wa-trash:hover:not(:disabled) { background: #f0f2f5; color: #ea0038; }
+.wa-send { display: grid; place-items: center; width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%; background: #00a884; color: white; transition: background .15s, transform .15s; }
+.wa-send:hover:not(:disabled) { background: #008069; transform: scale(1.05); }
+.wa-stop { background: #ea0038; }
+.wa-stop:hover:not(:disabled) { background: #c4002f; }
+.wa-switch { justify-self: center; font-size: 13px; font-weight: 600; color: #008069; }
+.wa-chat button:disabled { opacity: .55; cursor: default; transform: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@keyframes wa-dots { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+@keyframes wa-blink { 50% { opacity: .25; } }
+@keyframes wa-pop { from { opacity: 0; transform: translateY(4px) scale(.98); } }
+@media (max-width: 500px) {
+  .wa-chat { height: calc(100dvh - 150px); min-height: 440px; border-radius: 12px; }
+  .wa-bubble { max-width: 88%; }
+  .wa-history select { max-width: 30vw; }
+  .wa-field textarea { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .wa-bubble, .wa-typing span, .wa-dot { animation: none; } }

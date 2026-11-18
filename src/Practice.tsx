@@ -1,12 +1,22 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { AudioLines, Headphones, Mic, RotateCcw, Send, Square } from 'lucide-react'
+import { ArrowLeft, CheckCheck, Headphones, Lightbulb, Mic, MessageSquarePlus, Send, Square, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { accountApi, errorMessage } from './account'
 
-type Turn = { id: string; message: string; reply: string; seconds: number; audio?: string | null }
+type Turn = { id: string; message: string; reply: string; seconds: number; audio?: string | null; created_at?: string; at?: number }
 type Conversation = { id: string; title: string; mode: 'text' | 'voice'; updated_at: string }
 type TurnResult = { turn: Turn; audio: string | null }
 const starters = ['Tell me about your weekend.', 'Help me practice for a job interview.', 'How do I use the present perfect?']
+
+function clock(turn: Turn) {
+  const date = turn.at ? new Date(turn.at) : turn.created_at ? new Date(turn.created_at) : null
+  return date && !Number.isNaN(date.getTime()) ? date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''
+}
+
+function duration(seconds: number) {
+  const total = Math.max(0, Math.round(seconds))
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+}
 
 function encodeAudio(blob: Blob) {
   return new Promise<string>((resolve, reject) => {
@@ -28,6 +38,7 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
   const [state, setState] = useState<'idle' | 'permission' | 'recording' | 'sending'>('idle')
   const [error, setError] = useState('')
   const [clip, setClip] = useState<{ data: Blob; url: string; seconds: number } | null>(null)
+  const [elapsed, setElapsed] = useState(0)
   const conversation = useRef('')
   const retry = useRef('')
   const recorder = useRef<MediaRecorder | null>(null)
@@ -62,8 +73,16 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
   }, [clip])
 
   useEffect(() => {
-    if (lastTurn) end.current?.scrollIntoView({ block: 'nearest' })
-  }, [lastTurn])
+    if (lastTurn || state === 'sending') end.current?.scrollIntoView({ block: 'nearest' })
+  }, [lastTurn, state])
+
+  useEffect(() => {
+    if (state !== 'recording') return
+    const started = Date.now()
+    setElapsed(0)
+    const timer = window.setInterval(() => setElapsed((Date.now() - started) / 1000), 250)
+    return () => window.clearInterval(timer)
+  }, [state])
 
   async function startRecording() {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
@@ -138,7 +157,7 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
       const message = clip ? { audio: await encodeAudio(clip.data), mimeType: clip.data.type, seconds: clip.seconds } : { text }
       const result = await accountApi<TurnResult>('turn', { conversationId, turnId, mode, ...message }, controller.signal)
       if (!mount.current) return
-      setTurns(previous => [...previous.filter(turn => turn.id !== result.turn.id), { ...result.turn, audio: result.audio }])
+      setTurns(previous => [...previous.filter(turn => turn.id !== result.turn.id), { ...result.turn, audio: result.audio, at: Date.now() }])
       setConversations(previous => {
         const item = previous.find(entry => entry.id === conversationId)
         return [{ id: conversationId, title: item?.title || result.turn.message.slice(0, 72), mode, updated_at: new Date().toISOString() },
@@ -208,72 +227,91 @@ export default function Practice({ voice = false }: { voice?: boolean }) {
     finally { setAudioPending(previous => previous.filter(id => id !== turnId)) }
   }
 
+  const status = state === 'sending' ? (voice ? 'écoute ton vocal…' : 'écrit…') : state === 'recording' ? 't’écoute…' : 'en ligne'
+  const busy = state !== 'idle' || loading
+  const canSend = voice ? !!clip : !!draft.trim()
+
   return <section className="practice">
     <header className="practice-header">
       <h1 lang="en">{voice ? 'Speaking Practice' : 'AI Tutor'}</h1>
       <p>{voice ? 'Parle en anglais, puis écoute la réponse de Nova.' : 'Écris en anglais et reçois des corrections expliquées en français.'}</p>
     </header>
-    <section className="practice-chat" aria-label="Conversation avec Nova">
-      <div className="practice-toolbar">
-        <label>Historique <select value={selected} disabled={state !== 'idle' || loading} onChange={event => openConversation(event.target.value)}>
-          <option value="">Nouvelle conversation</option>
-          {conversations.map(entry => <option key={entry.id} value={entry.id}>{entry.title}</option>)}
-        </select></label>
-        <button type="button" className="text-link" disabled={state !== 'idle' || loading} onClick={reset}>
-          <RotateCcw size={16} aria-hidden="true" /> Nouvelle conversation</button>
+    <section className="wa-chat" aria-label="Conversation avec Nova">
+      <div className="wa-bar">
+        {selected && <button type="button" className="wa-icon" aria-label="Nouvelle conversation" disabled={busy} onClick={reset}><ArrowLeft size={20} /></button>}
+        <img className="wa-avatar" src="/mate.svg" alt="" width="40" height="40" />
+        <div className="wa-contact">
+          <strong>Nova</strong>
+          <small className={state !== 'idle' ? 'wa-live' : ''} aria-live="polite">{status}</small>
+        </div>
+        <label className="wa-history"><span className="sr-only">Historique</span>
+          <select value={selected} disabled={busy} onChange={event => openConversation(event.target.value)}>
+            <option value="">Historique…</option>
+            {conversations.map(entry => <option key={entry.id} value={entry.id}>{entry.title}</option>)}
+          </select>
+        </label>
+        <button type="button" className="wa-icon" aria-label="Nouvelle conversation" title="Nouvelle conversation" disabled={busy} onClick={reset}>
+          <MessageSquarePlus size={20} /></button>
       </div>
-      {voice && <div className={`speaking-avatar ${state === 'recording' ? 'speaking-active' : ''}`}>
-        <AudioLines aria-hidden="true" /><img src="/mate.svg" alt="Nova" width="72" height="72" /><AudioLines aria-hidden="true" />
-      </div>}
-      <div className="practice-thread" role="log" aria-label="Messages">
-        {more && <button className="text-link" type="button" disabled={loading || state !== 'idle'} onClick={loadOlder}>Afficher les messages précédents</button>}
-        {loading && <p role="status">Chargement de la conversation…</p>}
-        {!turns.length && <p className="practice-welcome" lang="en">Hi, I’m Nova! What would you like to talk about today?</p>}
+      <div className="wa-thread" role="log" aria-label="Messages">
+        {more && <button className="wa-chip wa-chip-button" type="button" disabled={busy} onClick={loadOlder}>Afficher les messages précédents</button>}
+        {loading && <p className="wa-chip" role="status">Chargement de la conversation…</p>}
+        <p className="wa-chip wa-chip-info">🔒 Tes messages servent uniquement à ta pratique avec Nova.</p>
+        {!turns.length && !loading && <div className="wa-bubble wa-in wa-tail"><p lang="en">Hi, I’m Nova! 👋 What would you like to talk about today?</p></div>}
         {turns.map(turn => {
           const separator = turn.reply.match(/💬\s*(?:Nova)?\s*[:\n\-–]?/i)
           const corrections = separator?.index === undefined ? '' : turn.reply.slice(0, separator.index).replace(/^💡\s*Corrections(?:\s*&\s*Conseils)?\s*:\s*/i, '').trim()
           const answer = separator?.index === undefined ? turn.reply : turn.reply.slice(separator.index + separator[0].length).trim()
-          return <div className="practice-turn" key={turn.id}>
-            <div className="practice-user"><strong>{voice ? 'Ton vocal · Transcription' : 'Toi'}</strong><p>{turn.message}</p></div>
-            {corrections && <div className="practice-correction"><strong>Corrections</strong><p>{corrections}</p></div>}
-            <div className="practice-reply"><strong>Nova</strong><p lang="en">{answer}</p>
+          const time = clock(turn)
+          return <div className="wa-turn" key={turn.id}>
+            <div className="wa-bubble wa-out wa-tail">
+              {voice && <span className="wa-voice-label"><Mic size={14} aria-hidden="true" /> Message vocal{turn.seconds ? ` · ${duration(turn.seconds)}` : ''}</span>}
+              <p>{turn.message}</p>
+              <span className="wa-meta">{time}<CheckCheck size={16} className="wa-read" aria-label="Lu" /></span>
+            </div>
+            <div className="wa-bubble wa-in wa-tail">
+              {corrections && <div className="wa-quote"><strong><Lightbulb size={14} aria-hidden="true" /> Corrections</strong><p>{corrections}</p></div>}
+              <p lang="en">{answer}</p>
               {turn.audio ? <audio controls preload="none" src={`data:audio/mpeg;base64,${turn.audio}`} aria-label="Réponse audio en anglais" /> :
-                <button className="text-link" type="button" disabled={audioPending.includes(turn.id)} onClick={() => play(turn.id)}>
-                  <Headphones size={16} aria-hidden="true" />{audioPending.includes(turn.id) ? 'Préparation…' : 'Écouter la réponse'}</button>}
+                <button className="wa-listen" type="button" disabled={audioPending.includes(turn.id)} onClick={() => play(turn.id)}>
+                  <Headphones size={15} aria-hidden="true" />{audioPending.includes(turn.id) ? 'Préparation…' : 'Écouter'}</button>}
+              <span className="wa-meta">{time}</span>
             </div>
           </div>
         })}
-        {state === 'sending' && <p role="status">{voice ? 'Nova transcrit ton vocal, prépare les corrections et génère la réponse audio…' : 'Nova prépare ta réponse…'}</p>}
+        {state === 'sending' && <div className="wa-bubble wa-in wa-tail wa-typing" role="status" aria-label={voice ? 'Nova écoute ton vocal' : 'Nova écrit'}>
+          <span /><span /><span /></div>}
         <div ref={end} />
       </div>
-      <form className="practice-form" onSubmit={send}>
-        {clip ? <div className="practice-preview">
-          <audio controls src={clip.url} aria-label="Réécouter ton enregistrement" />
-          <button className="text-link" type="button" disabled={state !== 'idle'} onClick={() => { setClip(null); setError(''); retry.current = '' }}>Annuler le vocal</button>
-        </div> : !voice && <label htmlFor="practice-message">Ton message<textarea id="practice-message" value={draft}
-          disabled={state !== 'idle' || loading} placeholder="Write something in English…" rows={3} maxLength={1500} onChange={event => {
-            retry.current = ''
-            setDraft(event.target.value)
-          }} /></label>}
-        {!voice && !turns.length && !draft && <div className="practice-suggestions">
-          {starters.map(text => <button className="text-link" type="button" disabled={loading || state !== 'idle'} key={text} onClick={() => setDraft(text)}>{text}</button>)}
+      <form className="wa-composer" onSubmit={send}>
+        {!voice && !turns.length && !draft && <div className="wa-suggestions">
+          {starters.map(text => <button type="button" disabled={busy} key={text} onClick={() => setDraft(text)}>{text}</button>)}
         </div>}
-        <div className="practice-actions">
-          {voice && !clip && (state === 'recording'
-            ? <button className="button practice-secondary" type="button" onClick={() => recorder.current?.stop()}><Square size={16} /> Arrêter</button>
-            : <button className="button practice-mic" type="button" disabled={state !== 'idle' || loading} onClick={startRecording}><Mic size={21} /> Enregistrer un vocal</button>)}
-          <button className="button" type="submit" disabled={state !== 'idle' || loading || (voice ? !clip : !draft.trim())}><Send size={17} /> Envoyer</button>
-          {voice && <Link className="text-link" to="/app/tutor">Continuer à l’écrit</Link>}
+        {state === 'permission' && <p className="wa-hint" role="status">En attente de l’autorisation du micro… <button type="button" onClick={() => {
+          microphoneAttempt.current++
+          setState('idle')
+        }}>Annuler</button></p>}
+        {error && <p className="practice-error wa-hint" role="alert">{error}</p>}
+        <div className="wa-input-row">
+          <div className="wa-field">
+            {clip ? <div className="wa-preview">
+              <button className="wa-icon wa-trash" type="button" aria-label="Supprimer le vocal" disabled={state !== 'idle'} onClick={() => { setClip(null); setError(''); retry.current = '' }}><Trash2 size={19} /></button>
+              <audio controls src={clip.url} aria-label="Réécouter ton enregistrement" />
+            </div> : state === 'recording' ? <p className="wa-recording" role="status"><span className="wa-dot" /> {duration(elapsed)} <small>· max 0:45</small></p>
+              : voice ? <p className="wa-placeholder">Appuie sur le micro pour parler en anglais</p>
+              : <textarea id="practice-message" aria-label="Ton message" value={draft} disabled={busy} placeholder="Write something in English…" rows={1} maxLength={1500}
+                onChange={event => { retry.current = ''; setDraft(event.target.value) }}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() }
+                }} />}
+          </div>
+          {voice && !clip
+            ? state === 'recording'
+              ? <button className="wa-send wa-stop" type="button" aria-label="Arrêter l’enregistrement" onClick={() => recorder.current?.stop()}><Square size={18} fill="currentColor" /></button>
+              : <button className="wa-send" type="button" aria-label="Enregistrer un vocal" disabled={busy} onClick={startRecording}><Mic size={22} /></button>
+            : <button className="wa-send" type="submit" aria-label="Envoyer" disabled={busy || !canSend}><Send size={20} /></button>}
         </div>
-        {state === 'recording' && <p role="status">Enregistrement en cours. Durée maximale de 45 secondes.</p>}
-        {state === 'permission' && <div>
-          <p role="status">En attente de l’autorisation du micro.</p>
-          <button type="button" className="text-link" onClick={() => {
-            microphoneAttempt.current++
-            setState('idle')
-          }}>Annuler la demande</button>
-        </div>}
-        {error && <p className="practice-error" role="alert">{error}</p>}
+        {voice && <Link className="wa-switch" to="/app/tutor">Continuer à l’écrit</Link>}
       </form>
     </section>
   </section>
